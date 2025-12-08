@@ -1,4 +1,4 @@
-// script.js – versi sinkron dengan index.html old money
+// script.js – sinkron dengan index.html old money + support gambar + ikon tengkorak error
 
 document.addEventListener('DOMContentLoaded', async () => {
     const apiContent = document.getElementById('apiContent');
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (apiContent) {
                 apiContent.innerHTML = `
                     <div class="no-results-message text-center p-5">
-                        <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                        <i class="fas fa-skull-crossbones fa-3x mb-3 icon-error-skull"></i>
                         <p class="h5">Gagal memuat konfigurasi API.</p>
                         <p class="text-muted">Periksa file <code>src/settings.json</code> atau coba muat ulang halaman.</p>
                         <button class="btn btn-primary mt-3" onclick="location.reload()">
@@ -74,14 +74,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const method = (item.method || 'GET').toUpperCase();
                 const categorySlug = (catName || 'other').toLowerCase().replace(/\s+/g, '-');
 
-                // API CARD
                 const card = document.createElement('article');
                 card.className = 'api-card';
                 card.dataset.category = categorySlug;
                 card.dataset.name = name.toLowerCase();
                 card.dataset.desc = desc.toLowerCase();
 
-                // HEADER
                 const headerRow = document.createElement('div');
                 headerRow.className = 'api-card-header';
 
@@ -105,7 +103,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 headerRow.appendChild(info);
                 headerRow.appendChild(badge);
 
-                // FOOTER
                 const footer = document.createElement('div');
                 footer.className = 'api-card-footer';
 
@@ -132,7 +129,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             apiContent.appendChild(section);
         });
 
-        // Setelah render, apply filter + search pertama kali biar sinkron
         applyFilterAndSearch();
     }
 
@@ -195,18 +191,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Integrasi dengan filter chip di index.html:
     const filterChips = document.querySelectorAll('.filter-chip');
     if (filterChips.length) {
         filterChips.forEach(chip => {
             chip.addEventListener('click', () => {
-                // biarkan listener di index jalan, lalu kita rapikan state akhir
                 setTimeout(applyFilterAndSearch, 0);
             });
         });
     }
 
-    // Shortcut "/" untuk fokus search (kalau index belum handle)
     document.addEventListener('keydown', (e) => {
         if (e.key === '/' &&
             document.activeElement.tagName !== 'INPUT' &&
@@ -236,7 +229,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const base = window.location.origin;
         const url = new URL(path, base).href;
 
-        // Integrasi dengan helper dari index.html (window.adaUI)
         if (window.adaUI && typeof window.adaUI.startLoading === 'function') {
             window.adaUI.setRequestMeta({
                 method,
@@ -246,7 +238,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             window.adaUI.startLoading({ method, url });
         } else {
-            // fallback manual kalau adaUI belum ada
             if (apiSkeleton && apiResponseContent) {
                 apiSkeleton.classList.remove('d-none');
                 apiResponseContent.classList.add('d-none');
@@ -259,6 +250,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let responseText = '';
         let statusCode = '';
+        let isHtml = false;
 
         try {
             const controller = new AbortController();
@@ -268,11 +260,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             clearTimeout(timeoutId);
 
             statusCode = res.status;
-            const contentType = res.headers.get('Content-Type') || '';
+            const contentType = (res.headers.get('Content-Type') || '').toLowerCase();
 
             if (contentType.includes('application/json')) {
                 const data = await res.json();
                 responseText = JSON.stringify(data, null, 2);
+            } else if (contentType.startsWith('image/')) {
+                const blob = await res.blob();
+                const imgUrl = URL.createObjectURL(blob);
+                responseText = `<img src="${imgUrl}" alt="API Image" style="max-width:100%;border-radius:8px;display:block;margin:auto;" />`;
+                isHtml = true;
             } else {
                 responseText = await res.text();
             }
@@ -285,12 +282,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (window.adaUI && typeof window.adaUI.endLoading === 'function') {
             window.adaUI.endLoading({
                 responseText,
-                status: statusCode
+                status: statusCode,
+                isHtml
             });
         } else if (apiResponseContent) {
             if (apiSkeleton) apiSkeleton.classList.add('d-none');
             apiResponseContent.classList.remove('d-none');
-            apiResponseContent.textContent = responseText;
+            if (isHtml) {
+                apiResponseContent.innerHTML = responseText;
+            } else {
+                apiResponseContent.textContent = responseText;
+            }
         }
     }
 

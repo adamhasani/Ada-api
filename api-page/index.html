@@ -13,7 +13,7 @@
     <meta property="og:description" content="Eksplor endpoint Ada API melalui antarmuka elegan bergaya old money.">
     <meta property="og:image" content="/src/banner.gif">
 
-    <!-- Biar browser tau kita support light & dark -->
+    <!-- Browser support light & dark -->
     <meta name="color-scheme" content="light dark">
 
     <link rel="icon" href="/src/icon.png" type="image/png">
@@ -753,12 +753,19 @@
             align-items: center;
         }
 
+        /* Tombol Copy cURL (btn-ghost) – SUDAH DIPERTEGAS */
         .btn-ghost {
             border-radius: 999px;
-            border: 1px solid rgba(27,38,32,0.18);
-            background: rgba(255,255,255,0.7);
+            border: 1px solid #b89b57;
+            background: #fdf7ea;
             font-size: 0.78rem;
             padding: 0.25rem 0.8rem;
+            color: #2f2c24;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+
+        .btn-ghost:hover {
+            background: #f3e2b8;
         }
 
         .code-block {
@@ -769,6 +776,12 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             font-size: 0.78rem;
             box-shadow: 0 10px 26px rgba(0,0,0,0.6);
+        }
+
+        /* Ikon tengkorak untuk error settings */
+        .icon-error-skull {
+            color: #b02a37;
+            text-shadow: 0 0 10px rgba(176, 42, 55, 0.6);
         }
 
         @media (min-width: 992px) {
@@ -990,6 +1003,16 @@
             color: #c5bca5;
         }
 
+        /* Dark version tombol Copy cURL */
+        body.dark-mode .btn-ghost {
+            background: rgba(9,14,11,0.96);
+            border-color: rgba(214,193,140,0.8);
+            color: #f4ecd4;
+            box-shadow:
+                0 6px 18px rgba(0,0,0,0.9),
+                0 0 14px rgba(93,184,136,0.3);
+        }
+
         body.dark-mode .search-input-group {
             background: rgba(12, 18, 15, 0.98);
             border-color: rgba(214,193,140,0.55);
@@ -1032,6 +1055,13 @@
 
         body.dark-mode .modal-elegant .modal-header {
             background: linear-gradient(to right, #161c17, #111612);
+        }
+
+        body.dark-mode .icon-error-skull {
+            color: #ff7b7b;
+            text-shadow:
+                0 0 14px rgba(255, 123, 123, 0.9),
+                0 0 28px rgba(120, 0, 0, 0.8);
         }
     </style>
 </head>
@@ -1207,6 +1237,7 @@
     </div>
 </div>
 
+<!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/script.js"></script>
@@ -1362,11 +1393,20 @@
             apiResponseContent.classList.add('d-none');
         }
 
-        function showResponse(text) {
+        // showResponse sekarang menerima payload {responseText, isHtml}
+        function showResponse(payload) {
             if (!apiSkeleton || !apiResponseContent) return;
             apiSkeleton.classList.add('d-none');
             apiResponseContent.classList.remove('d-none');
-            apiResponseContent.textContent = text;
+
+            const isHtml = payload && payload.isHtml;
+            const text = payload && payload.responseText ? payload.responseText : '';
+
+            if (isHtml) {
+                apiResponseContent.innerHTML = text;
+            } else {
+                apiResponseContent.textContent = text;
+            }
         }
 
         function pushHistory(meta) {
@@ -1397,6 +1437,7 @@
             });
         }
 
+        // Helper yang dipakai di script.js
         window.adaUI = {
             setRequestMeta(meta) {
                 currentRequestMeta = meta || null;
@@ -1415,7 +1456,7 @@
                         status: payload.status
                     });
                 }
-                showResponse(payload && payload.responseText ? payload.responseText : '');
+                showResponse(payload);
             }
         };
     });
