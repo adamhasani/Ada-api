@@ -1,14 +1,14 @@
 {
-  "name": "Ada-Api",
+  "name": "Ada API UI",
   "version": "v1.0.0",
-  "description": "Simple and easy to use API.",
-  "bannerImage": "/src/banner.jpg",
+  "description": "Simple and easy to use API console for Ada API.",
+  "bannerImage": "/src/banner.gif",
   "header": {
     "status": "Online!"
   },
   "apiSettings": {
-    "creator": "Adha", 
-    "apikey": ["adha-api"]
+    "creator": "Ada",
+    "apikey": ["ada-api"]
   },
   "categories": [
     {
@@ -16,21 +16,23 @@
       "items": [
         {
           "name": "LuminAI",
-          "desc": "Talk with luminai",
-          "path": "/ai/luminai?text=",
+          "desc": "Talk with LuminAI. Contoh: text=halo dari web",
+          "path": "/ai/luminai?text=halo%20dari%20web",
           "status": "ready",
+          "method": "GET",
           "params": {
             "text": "Text for luminai to respond to"
           }
         },
-       {
+        {
           "name": "HydroMind",
-          "desc": "See the list of supported AI models here: https://mind.hydrooo.web.id",
-          "path": "/ai/hydromind?text=&model=",
+          "desc": "Chat AI via HydroMind. Contoh: text=halo; model=isi sesuai daftar di mind.hydrooo.web.id",
+          "path": "/ai/hydromind?text=halo%20dari%20web&model=gpt-4o",
           "status": "ready",
+          "method": "GET",
           "params": {
             "text": "Teks atau perintah untuk chat AI",
-            "model":"1See the list of supported AI models here: https://mind.hydrooo.web.id"
+            "model": "See the list of supported AI models here: https://mind.hydrooo.web.id"
           }
         }
       ]
@@ -40,9 +42,10 @@
       "items": [
         {
           "name": "Blue Archive",
-          "desc": "Blue Archive Random Images",
+          "desc": "Blue Archive random images.",
           "path": "/random/ba",
-          "status": "ready"
+          "status": "ready",
+          "method": "GET"
         }
       ]
     },
@@ -51,14 +54,15 @@
       "items": [
         {
           "name": "YouTube",
-          "desc": "Video search",
-          "path": "/search/youtube?q=",
+          "desc": "Video search. Contoh: q=lofi hip hop",
+          "path": "/search/youtube?q=lofi%20hip%20hop",
           "status": "ready",
+          "method": "GET",
           "params": {
             "q": "Search query"
           }
         }
       ]
-    }               
+    }
   ]
 }
