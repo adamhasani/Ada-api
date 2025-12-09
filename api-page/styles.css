@@ -16,7 +16,7 @@
 /* tema internal dari script: noir, emerald-gold, royal-amber, cyber-glow */
 body[data-theme="noir"] {
   --bg-body: #0c1011;
-  --bg-panel: #14191c;
+  --bg-panel: rgba(20, 25, 28, 0.92);
   --text-main: #f6f3ea;
   --text-soft: #b9b3a4;
   --accent-color: #79d2a2;
@@ -26,7 +26,7 @@ body[data-theme="noir"] {
 }
 body[data-theme="emerald-gold"] {
   --bg-body: #101712;
-  --bg-panel: #151d17;
+  --bg-panel: rgba(21, 29, 23, 0.95);
   --text-main: #f7f2e7;
   --text-soft: #c2b9a6;
   --accent-color: #67d28f;
@@ -46,7 +46,7 @@ body[data-theme="royal-amber"] {
 }
 body[data-theme="cyber-glow"] {
   --bg-body: #02080b;
-  --bg-panel: #071019;
+  --bg-panel: rgba(7, 16, 25, 0.96);
   --text-main: #e7fff9;
   --text-soft: #b9f4e6;
   --accent-color: #78ffd2;
@@ -101,15 +101,18 @@ body.dark-mode {
 }
 
 /* ======================================
-   SIDEBAR
+   SIDEBAR (GLASS)
    ====================================== */
 .side-nav {
   position: fixed;
   inset: 0 auto 0 0;
   width: 250px;
-  background: linear-gradient(180deg, #151a16, #11140f);
+  /* glass effect */
+  background: radial-gradient(circle at top left,
+      rgba(18, 21, 18, 0.82),
+      rgba(7, 10, 8, 0.88));
   color: #f5efe2;
-  border-right: 1px solid rgba(230, 208, 163, 0.22);
+  border-right: 1px solid rgba(230, 208, 163, 0.35);
   padding: 1.2rem 1.1rem 1.4rem;
   display: flex;
   flex-direction: column;
@@ -117,6 +120,9 @@ body.dark-mode {
   z-index: 220;
   transform: translateX(0);
   transition: transform 0.25s ease;
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.65);
 }
 
 .side-nav.collapsed {
@@ -181,7 +187,7 @@ body.dark-mode {
   text-decoration: none;
   color: #dcd4be;
   font-size: 0.88rem;
-  opacity: 0.9;
+  opacity: 0.95;
   transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
@@ -210,7 +216,7 @@ body.dark-mode {
   align-self: flex-end;
   border-radius: 999px;
   border: 1px solid rgba(231, 210, 164, 0.7);
-  background: rgba(12, 18, 13, 0.95);
+  background: rgba(12, 18, 13, 0.98);
   color: #f4e7c7;
   width: 32px;
   height: 32px;
@@ -306,8 +312,8 @@ body > .main-wrapper {
 }
 
 body.dark-mode .main-header {
-  background: rgba(10, 14, 11, 0.96);
-  border-bottom-color: rgba(201, 189, 154, 0.16);
+  background: rgba(10, 14, 11, 0.9);
+  border-bottom-color: rgba(201, 189, 154, 0.22);
 }
 
 .header-left {
@@ -527,6 +533,7 @@ body.dark-mode .preset-select {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   margin: 0;
+  color: var(--text-main);
 }
 
 .hero-meta {
@@ -682,20 +689,27 @@ body.dark-mode .preset-select {
   margin-top: 2rem;
 }
 
-.section-title-oldmoney {
+.section-title-oldmoney,
+.section-title-small {
   font-family: "Playfair Display", serif;
-  font-size: 1.3rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   margin: 0;
+  /* bikin lebih jelas */
+  color: rgba(38, 37, 32, 0.9);
+}
+
+.section-title-oldmoney {
+  font-size: 1.3rem;
 }
 
 .section-title-small {
-  font-family: "Playfair Display", serif;
   font-size: 1rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  margin: 0;
+}
+
+body.dark-mode .section-title-oldmoney,
+body.dark-mode .section-title-small {
+  color: #f7f0de;
 }
 
 .section-subtitle {
