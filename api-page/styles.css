@@ -1223,20 +1223,252 @@ body[data-theme="royal-amber"] .api-link {
   object-fit: cover;            /* isi kartu tanpa melebar aneh */
   border-radius: 14px;
 }
-/* Bintang default abu, kuning hanya saat .favorited */
+/* ============================
+   1. KOTAK SWITCH / MODE TEMA
+   ============================ */
+
+/* Wrapper kotak di sekitar switch (pastikan HTML-nya punya class .theme-switcher) */
+.theme-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);      /* jelas di mode terang */
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+body.dark-mode .theme-switcher {
+  background: rgba(10, 16, 14, 0.96);         /* kontras dengan header gelap */
+  border-color: var(--accent-strong);
+  box-shadow:
+    0 0 12px var(--accent-soft),
+    0 10px 22px rgba(0, 0, 0, 0.85);
+}
+
+/* Track switch – lebih kontras dan ikut tema */
+.theme-switcher .switch .slider {
+  background: rgba(230, 230, 230, 0.98) !important;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+/* Knob di tengah vertikal, tidak nyangkut di bawah */
+.theme-switcher .switch .slider::before {
+  top: 50%;
+  bottom: auto;
+  transform: translate(0, -50%);
+}
+
+/* Posisi knob saat checked */
+.theme-switcher .switch input:checked + .slider::before {
+  transform: translate(18px, -50%);
+}
+
+/* Dark mode – track & knob tetap kebaca di atas background gelap */
+body.dark-mode .theme-switcher .switch .slider {
+  background: rgba(12, 20, 17, 0.98) !important;
+  border-color: var(--accent-strong);
+  box-shadow:
+    0 0 10px var(--accent-soft),
+    0 0 18px rgba(0, 0, 0, 0.6);
+}
+
+body.dark-mode .theme-switcher .switch .slider::before {
+  background: var(--accent-color) !important;
+  box-shadow: 0 0 14px var(--accent-strong);
+}
+
+/* ============================
+   2. BINTANG FAVORITE LEBIH JELAS
+   ============================ */
+
 .fav-toggle-btn i {
-  color: #b0ada4 !important;          /* abu default */
-  font-weight: 600;
+  /* bintang keemasan di mode terang */
+  color: #b5892f;
+  font-weight: 700;
 }
 
 .fav-toggle-btn.favorited i {
-  color: #d5b975 !important;          /* emas saat difavorit */
+  color: #d5b975;
 }
 
 body.dark-mode .fav-toggle-btn i {
-  color: #a9a59a !important;          /* abu terang di dark mode */
+  /* bintang terang di mode gelap */
+  color: #f9e29a;
 }
 
-body.dark-mode .fav-toggle-btn.favorited i {
-  color: #ffe49a !important;          /* emas terang di dark mode */
+/* ============================
+   3. TOMBOL SILANG (X) DI MODAL
+   ============================ */
+
+/* buang background-image default Bootstrap dan bikin X sendiri */
+.modal-header .btn-close {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.18),
+    0 0 10px rgba(255, 255, 255, 0.8);
+  opacity: 1 !important;
+  background-image: none !important; /* matikan ikon SVG bawaan */
+}
+
+/* X di tengah pakai pseudo-element */
+.modal-header .btn-close::before {
+  content: "×";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #000000;
+}
+
+.modal-header .btn-close:hover {
+  background: rgba(245, 245, 245, 1) !important;
+}
+
+/* Dark mode – tombol X kontras di atas header gelap */
+body.dark-mode .modal-header .btn-close {
+  background: rgba(8, 13, 11, 0.98) !important;
+  border-color: var(--accent-strong);
+  box-shadow:
+    0 0 12px var(--accent-strong),
+    0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+body.dark-mode .modal-header .btn-close::before {
+  color: #ffffff;
+}
+
+/* Supaya X di area endpoint/modal SELALU kebaca */
+body.dark-mode .modal-elegant .modal-header {
+  position: relative;
+  z-index: 1;
+}
+/* ============================================================
+   BANNER FIX – RESPONSIVE, GIF SAFE, OLD-MONEY BORDER FRAME
+   ============================================================ */
+
+/* HERO WRAPPER */
+.hero-section {
+  display: grid;
+  grid-template-columns: minmax(0,1.2fr) minmax(0,1fr);
+  gap: 3rem;
+  padding: 2.4rem 2rem 2rem;
+}
+
+/* VISUAL COLUMN */
+.hero-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+/* BANNER CONTAINER */
+.banner-container {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+
+  padding: 6px;                                 /* gold border padding */
+  border-radius: 22px;
+
+  /* old-money gold border */
+  background: linear-gradient(135deg, #d5b975, #b89a58);
+
+  /* shadow */
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.35),
+    0 0 22px rgba(213, 185, 117, 0.5);
+
+  overflow: hidden;                              /* <= FIX UTAMA */
+}
+
+/* BANNER IMAGE / GIF */
+.banner-container img,
+#dynamicImage,
+.banner {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;                             /* <= FIX supaya tidak melebar aneh */
+  display: block;
+
+  border-radius: 18px;                            /* frame dalam */
+}
+
+/* SHAPES BACKGROUND */
+.shape {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(48px);
+  opacity: 0.5;
+}
+
+.shape-1 {
+  width: 220px;
+  height: 220px;
+  background: rgba(96, 196, 144, 0.35);
+  top: -40px;
+  right: -40px;
+}
+
+.shape-2 {
+  width: 180px;
+  height: 180px;
+  background: rgba(213, 185, 117, 0.35);
+  bottom: -50px;
+  left: -20px;
+}
+
+.shape-3 {
+  width: 260px;
+  height: 260px;
+  background: rgba(120, 160, 110, 0.25);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+
+/* ============================================================
+   RESPONSIVE FIX – MOBILE BANNER
+   ============================================================ */
+
+@media (max-width: 991px) {
+  .hero-section {
+    grid-template-columns: 1fr;
+    padding-top: 1.5rem;
+    text-align: center;
+  }
+
+  .hero-visual {
+    margin-top: 1.8rem;
+  }
+
+  .banner-container {
+    max-width: 90%;
+    margin: 0 auto;
+  }
+}
+
+/* Small mobile fix */
+@media (max-width: 480px) {
+  .banner-container {
+    max-width: 94%;
+    padding: 4px;
+  }
+
+  .banner-container img {
+    border-radius: 16px;
+  }
 }
