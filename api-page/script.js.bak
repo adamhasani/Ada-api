@@ -1,0 +1,142 @@
+// ADA API UI FIXED VERSION (MATCH index.html)
+
+document.addEventListener("DOMContentLoaded", () => {
+  const searchInput = document.getElementById("searchInput");
+  const clearSearch = document.getElementById("clearSearch");
+  const apiContent = document.getElementById("apiContent");
+  const themeToggle = document.getElementById("themeToggle");
+  const presetSelect = document.getElementById("themePreset");
+
+  // ================================
+  // MODE TERANG / GELAP
+  // ================================
+  function applyMode(dark) {
+    if (dark) document.body.classList.add("dark-mode");
+    else document.body.classList.remove("dark-mode");
+  }
+
+  // load mode
+  if (localStorage.getItem("mode") === "dark") {
+    themeToggle.checked = true;
+    applyMode(true);
+  }
+
+  themeToggle.addEventListener("change", () => {
+    const dark = themeToggle.checked;
+    applyMode(dark);
+    localStorage.setItem("mode", dark ? "dark" : "light");
+  });
+
+  // ================================
+  // TEMA WARNA / PRESET
+  // ================================
+  function applyPreset(preset) {
+    document.body.setAttribute("data-theme", preset);
+    localStorage.setItem("preset", preset);
+  }
+
+  const savedPreset = localStorage.getItem("preset");
+  if (savedPreset) {
+    presetSelect.value = savedPreset;
+    applyPreset(savedPreset);
+  }
+
+  presetSelect.addEventListener("change", () => {
+    applyPreset(presetSelect.value);
+  });
+
+  // ================================
+  // PENCARIAN API
+  // ================================
+  function filterApis(query) {
+    const items = apiContent.querySelectorAll(".api-item");
+    query = query.toLowerCase();
+
+    items.forEach(card => {
+      const name = card.querySelector(".api-card-title")?.textContent.toLowerCase() || "";
+      const desc = card.querySelector(".api-card-desc")?.textContent.toLowerCase() || "";
+      const path = card.querySelector(".api-path")?.textContent.toLowerCase() || "";
+
+      const match = !query || name.includes(query) || desc.includes(query) || path.includes(query);
+      card.style.display = match ? "" : "none";
+    });
+  }
+
+  searchInput.addEventListener("input", () => {
+    filterApis(searchInput.value);
+  });
+
+  clearSearch.addEventListener("click", () => {
+    searchInput.value = "";
+    filterApis("");
+  });
+
+  // ================================
+  // FAVORIT (BINTANG)
+  // ================================
+  let favorites = JSON.parse(localStorage.getItem("api-fav") || "[]");
+
+  function toggleFav(btn, key) {
+    if (favorites.includes(key)) {
+      favorites = favorites.filter(f => f !== key);
+      btn.classList.remove("favorited");
+    } else {
+      favorites.push(key);
+      btn.classList.add("favorited");
+    }
+    localStorage.setItem("api-fav", JSON.stringify(favorites));
+  }
+
+  document.addEventListener("click", e => {
+    if (e.target.closest(".fav-toggle-btn")) {
+      const btn = e.target.closest(".fav-toggle-btn");
+      const key = btn.dataset.key;
+      toggleFav(btn, key);
+    }
+  });
+
+  // ================================
+  // MODAL API
+  // ================================
+  const modal = new bootstrap.Modal(document.getElementById("apiResponseModal"));
+  const modalTitle = document.getElementById("modalTitle");
+  const modalSubtitle = document.getElementById("modalSubtitle");
+  const endpointText = document.getElementById("endpointText");
+  const apiResponseContent = document.getElementById("apiResponseContent");
+  const copyEndpointBtn = document.getElementById("copyEndpointBtn");
+  const copyCurlBtn = document.getElementById("copyCurlBtn");
+
+  document.addEventListener("click", e => {
+    if (e.target.closest(".api-open-btn")) {
+      const card = e.target.closest(".api-card");
+      const name = card.querySelector(".api-card-title").textContent;
+      const desc = card.querySelector(".api-card-desc").textContent;
+      const path = card.querySelector(".api-path").textContent;
+
+      modalTitle.textContent = name;
+      modalSubtitle.textContent = desc;
+      endpointText.textContent = path;
+      apiResponseContent.textContent = "Menunggu respons…";
+
+      modal.show();
+
+      fetch(path)
+        .then(res => res.json())
+        .then(data => {
+          apiResponseContent.textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(() => {
+          apiResponseContent.textContent = "Gagal mengambil data.";
+        });
+    }
+  });
+
+  copyEndpointBtn.addEventListener("click", () => {
+    navigator.clipboard.writeText(endpointText.textContent);
+  });
+
+  copyCurlBtn.addEventListener("click", () => {
+    navigator.clipboard.writeText(`curl -X GET "${endpointText.textContent}"`);
+  });
+
+});
