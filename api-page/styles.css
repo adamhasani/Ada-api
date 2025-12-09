@@ -1564,3 +1564,104 @@ body.dark-mode .modal-toolbar i {
 body.dark-mode .endpoint-label {
   color: #f4efd9;
 }
+/* ================================================
+   FIX 1 — TOMBOL SILANG (X) DI MODAL SANGAT JELAS
+   ================================================ */
+
+.modal-header .btn-close {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1 !important; /* override bootstrap */
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.12),
+    0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+.modal-header .btn-close i {
+  color: #000000; /* X selalu hitam */
+  font-size: 1.15rem;
+  font-weight: bold;
+}
+
+/* DARK MODE VERSION — X jadi putih terang */
+body.dark-mode .modal-header .btn-close {
+  background: rgba(10, 16, 14, 0.92) !important;
+  border: 1px solid var(--accent-strong);
+  box-shadow:
+    0 0 12px var(--accent-strong),
+    0 0 4px rgba(0,0,0,0.8);
+}
+
+body.dark-mode .modal-header .btn-close i {
+  color: #ffffff !important; /* X putih terang */
+}
+
+
+/* =====================================================
+   FIX 2 — SWITCH THEME BACKGROUND IKUT TEMA PENUH WARNA
+   ===================================================== */
+
+/* TRACK mengikuti tema */
+.theme-switcher .slider {
+  background: var(--accent-soft) !important;
+  border: 1px solid var(--accent-strong);
+  box-shadow:
+    inset 0 0 4px rgba(0, 0, 0, 0.25),
+    0 0 10px var(--accent-soft);
+}
+
+/* KNOB mengikuti warna tema */
+.theme-switcher .slider::before {
+  background: var(--accent-color) !important;
+  box-shadow:
+    0 0 10px var(--accent-strong),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* POSISI KNOB SAAT CHECKED */
+.theme-switcher .switch input:checked + .slider::before {
+  transform: translateX(18px) translateY(-50%);
+}
+
+/* LIGHT MODE — track tetap kelihatan */
+body:not(.dark-mode) .theme-switcher .slider {
+  background: rgba(230, 230, 230, 0.9) !important;
+  border-color: rgba(0,0,0,0.15);
+}
+
+body:not(.dark-mode) .theme-switcher .slider::before {
+  background: #ffffff !important;
+  box-shadow: 0 0 6px rgba(0,0,0,0.25);
+}
+
+body:not(.dark-mode) .theme-switcher .switch input:checked + .slider {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-strong);
+}
+
+body:not(.dark-mode) .theme-switcher .switch input:checked + .slider::before {
+  background: var(--accent-color) !important;
+}
+
+
+/* DARK MODE SWITCH */
+body.dark-mode .theme-switcher .slider {
+  background: rgba(12, 20, 17, 0.95) !important;
+  border-color: var(--accent-strong);
+  box-shadow:
+    0 0 12px var(--accent-soft),
+    0 0 18px rgba(0,0,0,0.6);
+}
+
+body.dark-mode .theme-switcher .slider::before {
+  background: var(--accent-color) !important;
+  box-shadow: 0 0 14px var(--accent-strong);
+}
