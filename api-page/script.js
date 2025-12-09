@@ -705,10 +705,179 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  /* -----------------------------
-     INIT
-  ------------------------------ */
+// ====== DARK MODE + FOLLOW SYSTEM ======
+(function () {
+  const MODE_KEY = 'ada-ui-color-mode'; // 'light' | 'dark'
+  const toggle = document.getElementById('themeToggle');
+
+  function applyMode(mode) {
+    const isDark = mode === 'dark';
+    document.body.classList.toggle('dark-mode', isDark);
+    if (toggle) toggle.checked = isDark;
+  }
+
+  function detectSystemMode() {
+    try {
+      return window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+    } catch (e) {
+      return 'light';
+    }
+  }
+
+  function initMode() {
+    let stored = null;
+    try {
+      stored = localStorage.getItem(MODE_KEY);
+    } catch (e) {}
+
+    // Kalau belum pernah pilih manual, pakai sistem
+    const initialMode = stored === 'dark' || stored === 'light'
+      ? stored
+      : detectSystemMode();
+
+    applyMode(initialMode);
+
+    // Jika sistem berubah DAN user belum pernah pilih manual, boleh ikut
+    if (!stored && window.matchMedia) {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      try {
+        mq.addEventListener('change', (e) => {
+          const newMode = e.matches ? 'dark' : 'light';
+          applyMode(newMode);
+        });
+      } catch (_) {
+        // Safari lama: fallback
+        mq.addListener((e) => {
+          const newMode = e.matches ? 'dark' : 'light';
+          applyMode(newMode);
+        });
+      }
+    }
+
+    // Bind ke switch
+    if (toggle) {
+      toggle.addEventListener('change', () => {
+        const mode = toggle.checked ? 'dark' : 'light';
+        applyMode(mode);
+        try {
+          localStorage.setItem(MODE_KEY, mode);
+        } catch (e) {}
+      });
+    }
+  }
+
+  // Jalankan setelah DOM siap
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMode);
+  } else {
+    initMode();
+  }
+})();
   initThemeMode();
   initThemePreset();
   loadSettings();
 });
+// ====== MODE GELAP / TERANG (ikut sistem + switch) ======
+(function () {
+  const MODE_KEY = 'ada-ui-color-mode';
+  const toggle = document.getElementById('themeToggle');
+
+  function applyMode(mode) {
+    const isDark = mode === 'dark';
+    document.body.classList.toggle('dark-mode', isDark);
+    if (toggle) toggle.checked = isDark;
+  }
+
+  function detectSystemMode() {
+    try {
+      return window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+    } catch {
+      return 'light';
+    }
+  }
+
+  function initMode() {
+    let stored = null;
+    try {
+      stored = localStorage.getItem(MODE_KEY);
+    } catch {}
+
+    const initial =
+      stored === 'dark' || stored === 'light'
+        ? stored
+        : detectSystemMode();
+
+    applyMode(initial);
+
+    // follow system only if user belum override
+    if (!stored && window.matchMedia) {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = e => {
+        const newMode = e.matches ? 'dark' : 'light';
+        applyMode(newMode);
+      };
+      if (mq.addEventListener) mq.addEventListener('change', handler);
+      else mq.addListener(handler);
+    }
+
+    if (toggle) {
+      toggle.addEventListener('change', () => {
+        const mode = toggle.checked ? 'dark' : 'light';
+        applyMode(mode);
+        try {
+          localStorage.setItem(MODE_KEY, mode);
+        } catch {}
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMode);
+  } else {
+    initMode();
+  }
+})();
+
+// ====== TEMA (Noir / Emerald / Cyber / Amber) ======
+(function () {
+  const THEME_KEY = 'ada-ui-theme';
+  const select = document.getElementById('themePreset');
+  if (!select) return;
+
+  const THEMES = ['noir', 'emerald-gold', 'cyber-glow', 'royal-amber'];
+
+  function applyTheme(theme) {
+    if (!THEMES.includes(theme)) theme = 'emerald-gold';
+    document.body.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {}
+  }
+
+  function initTheme() {
+    let stored = null;
+    try {
+      stored = localStorage.getItem(THEME_KEY);
+    } catch {}
+
+    const initial =
+      stored && THEMES.includes(stored) ? stored : 'emerald-gold';
+    applyTheme(initial);
+
+    if ([...select.options].some(o => o.value === initial)) {
+      select.value = initial;
+    }
+  }
+
+  initTheme();
+
+  select.addEventListener('change', () => {
+    applyTheme(select.value);
+  });
+})();
