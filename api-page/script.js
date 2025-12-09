@@ -20,7 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
     liveLogs: document.getElementById("liveLogs"),
 
     cursorGlow: document.getElementById("cursorGlow"),
-
     bannerParallax: document.getElementById("bannerParallax"),
 
     apiRequestInput: document.getElementById("apiRequestInput"),
@@ -139,48 +138,46 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem(THEME_MODE_KEY, m);
       });
     }
+
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            if (!localStorage.getItem(THEME_MODE_KEY)) {
+                applyThemeMode(e.matches ? "dark" : "light");
+            }
+        });
+    }
   }
 
   function applyPreset(preset) {
     const root = document.documentElement;
+    DOM.body.setAttribute('data-theme', preset);
+    
+    // Fallback variables for JS logic if needed, but CSS handles most
     switch (preset) {
       case "noir":
         root.style.setProperty("--accent-color", "#cccccc");
-        root.style.setProperty("--accent-soft", "rgba(204,204,204,0.26)");
-        root.style.setProperty("--accent-strong", "rgba(204,204,204,0.9)");
         break;
-      case "ivory":
-        root.style.setProperty("--accent-color", "#f2d4a6");
-        root.style.setProperty("--accent-soft", "rgba(242,212,166,0.28)");
-        root.style.setProperty("--accent-strong", "rgba(242,212,166,0.9)");
+      case "royal-amber":
+        root.style.setProperty("--accent-color", "#f3c47a");
         break;
-      case "cyber":
-        root.style.setProperty("--accent-color", "#5cf0ff");
-        root.style.setProperty("--accent-soft", "rgba(92,240,255,0.3)");
-        root.style.setProperty("--accent-strong", "rgba(92,240,255,0.9)");
+      case "cyber-glow":
+        root.style.setProperty("--accent-color", "#78ffd2");
         break;
-      case "olive":
-        root.style.setProperty("--accent-color", "#6e7b4f");
-        root.style.setProperty("--accent-soft", "rgba(110,123,79,0.3)");
-        root.style.setProperty("--accent-strong", "rgba(110,123,79,0.9)");
-        break;
-      case "emerald":
+      case "emerald-gold":
       default:
         root.style.setProperty("--accent-color", "#60c490");
-        root.style.setProperty("--accent-soft", "rgba(96,196,144,0.22)");
-        root.style.setProperty("--accent-strong", "rgba(96,196,144,0.8)");
-        preset = "emerald";
+        preset = "emerald-gold";
         break;
     }
   }
 
   function initThemePreset() {
-    let preset = localStorage.getItem(THEME_PRESET_KEY) || "emerald";
+    let preset = localStorage.getItem(THEME_PRESET_KEY) || "emerald-gold";
     applyPreset(preset);
     if (DOM.themePreset) {
       DOM.themePreset.value = preset;
       DOM.themePreset.addEventListener("change", () => {
-        const p = DOM.themePreset.value || "emerald";
+        const p = DOM.themePreset.value || "emerald-gold";
         applyPreset(p);
         localStorage.setItem(THEME_PRESET_KEY, p);
       });
@@ -192,14 +189,16 @@ document.addEventListener("DOMContentLoaded", () => {
   ------------------------------ */
   function setSidebar(open) {
     if (window.innerWidth > 991) return;
+    if (!DOM.sideNav) return;
+    
     if (open) {
       DOM.sideNav.classList.add("open");
       DOM.body.classList.add("sidebar-open");
-      DOM.sidebarBackdrop.classList.add("show");
+      if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.classList.add("show");
     } else {
       DOM.sideNav.classList.remove("open");
       DOM.body.classList.remove("sidebar-open");
-      DOM.sidebarBackdrop.classList.remove("show");
+      if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.classList.remove("show");
     }
   }
 
@@ -216,14 +215,13 @@ document.addEventListener("DOMContentLoaded", () => {
     DOM.sidebarBackdrop.addEventListener("click", () => setSidebar(false));
   }
   window.addEventListener("resize", () => {
-    if (window.innerWidth > 991) {
+    if (window.innerWidth > 991 && DOM.sideNav) {
       DOM.sideNav.classList.remove("open");
       DOM.body.classList.remove("sidebar-open");
-      DOM.sidebarBackdrop.classList.remove("show");
+      if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.classList.remove("show");
     }
   });
 
-  // nav link scroll + active
   DOM.navLinks.forEach(link => {
     link.addEventListener("click", e => {
       const href = link.getAttribute("href");
@@ -232,27 +230,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const target = document.querySelector(href);
         if (target) {
           const headerHeight = document.querySelector(".main-header")?.offsetHeight || 60;
-          const y = target.getBoundingClientRect().top + window.pageYOffset - headerHeight - 8;
+          const y = target.getBoundingClientRect().top + window.pageYOffset - headerHeight - 10;
           window.scrollTo({ top: y, behavior: "smooth" });
         }
         DOM.navLinks.forEach(l => l.classList.remove("active"));
         link.classList.add("active");
-      }
-    });
-  });
-
-  window.addEventListener("scroll", () => {
-    const headerHeight = document.querySelector(".main-header")?.offsetHeight || 60;
-    const scrollPos = window.scrollY + headerHeight + 30;
-    document.querySelectorAll("main section[id]").forEach(section => {
-      const top = section.offsetTop;
-      const h = section.offsetHeight;
-      const id = section.id;
-      const navLink = document.querySelector(`.side-nav-link[href="#${id}"]`);
-      if (!navLink) return;
-      if (scrollPos >= top && scrollPos < top + h) {
-        DOM.navLinks.forEach(l => l.classList.remove("active"));
-        navLink.classList.add("active");
+        setSidebar(false);
       }
     });
   });
@@ -275,7 +258,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* -----------------------------
-     REQUEST API BOX → WHATSAPP
+     WHATSAPP REQUEST
   ------------------------------ */
   if (DOM.sendApiRequest && DOM.apiRequestInput) {
     DOM.sendApiRequest.addEventListener("click", () => {
@@ -292,7 +275,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* -----------------------------
-     AMBIENT CURSOR GLOW
+     CURSOR & PARALLAX
   ------------------------------ */
   if (DOM.cursorGlow) {
     window.addEventListener("pointermove", e => {
@@ -309,17 +292,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* -----------------------------
-     PARALLAX BANNER
-  ------------------------------ */
   if (DOM.bannerParallax) {
     DOM.bannerParallax.addEventListener("mousemove", e => {
       const rect = DOM.bannerParallax.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width - 0.5;
       const y = (e.clientY - rect.top) / rect.height - 0.5;
-      const rotateX = y * -6;
-      const rotateY = x * 6;
-      DOM.bannerParallax.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+      DOM.bannerParallax.style.transform = `rotateX(${y * -6}deg) rotateY(${x * 6}deg)`;
     });
     DOM.bannerParallax.addEventListener("mouseleave", () => {
       DOM.bannerParallax.style.transform = "rotateX(0deg) rotateY(0deg)";
@@ -338,13 +316,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
     },
-    { threshold: 0.15 }
+    { threshold: 0.1 }
   );
-
   document.querySelectorAll(".reveal").forEach(el => revealObserver.observe(el));
 
   /* -----------------------------
-     SETTINGS & API RENDER
+     RENDER & FILTERS
   ------------------------------ */
   function renderFiltersFromSettings() {
     if (!DOM.apiFilters || !settings || !settings.categories) return;
@@ -356,6 +333,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.dataset.filter = value;
       if (icon) btn.innerHTML = `<i class="${icon} me-1"></i>${label}`;
       else btn.textContent = label;
+      
       btn.addEventListener("click", () => {
         document.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
         btn.classList.add("active");
@@ -368,9 +346,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const allChip = makeChip("Semua", "all", "fas fa-layer-group");
     allChip.classList.add("active");
     DOM.apiFilters.appendChild(allChip);
-
-    const favChip = makeChip("Favorit", "favorites", "fas fa-star");
-    DOM.apiFilters.appendChild(favChip);
+    DOM.apiFilters.appendChild(makeChip("Favorit", "favorites", "fas fa-star"));
 
     settings.categories.forEach(cat => {
       const slug = slugify(cat.name);
@@ -384,7 +360,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     settings.categories.forEach(cat => {
       const slug = slugify(cat.name);
-
       cat.items.forEach((item, idx) => {
         const id = `${slug}_${idx}_${item.name}`;
         const method = (item.method || "GET").toUpperCase();
@@ -416,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const metaRow = document.createElement("div");
         metaRow.className = "card-meta-row";
-
+        
         const methodBadge = document.createElement("span");
         methodBadge.className = "http-badge " + getMethodClass(method);
         methodBadge.textContent = method;
@@ -431,21 +406,21 @@ document.addEventListener("DOMContentLoaded", () => {
         titleBlock.appendChild(metaRow);
 
         const favBtn = document.createElement("button");
-        favBtn.type = "button";
         favBtn.className = "fav-toggle-btn";
-        favBtn.innerHTML = '<i class="far fa-star"></i>';
-        if (isFavorite(id)) {
-          favBtn.classList.add("favorited");
-          favBtn.innerHTML = '<i class="fas fa-star"></i>';
-        }
+        favBtn.innerHTML = isFavorite(id) ? '<i class="fas fa-star"></i>' : '<i class="far fa-star"></i>';
+        if (isFavorite(id)) favBtn.classList.add("favorited");
+        
         favBtn.addEventListener("click", () => {
           if (isFavorite(id)) {
             favorites = favorites.filter(v => v !== id);
+            favBtn.classList.remove("favorited");
+            favBtn.innerHTML = '<i class="far fa-star"></i>';
           } else {
             favorites.push(id);
+            favBtn.classList.add("favorited");
+            favBtn.innerHTML = '<i class="fas fa-star"></i>';
           }
           saveFavorites();
-          updateFavButtonState(favBtn, id);
           applyFilters();
         });
 
@@ -454,37 +429,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const footer = document.createElement("div");
         footer.className = "api-card-footer";
-
+        
         const pathEl = document.createElement("div");
         pathEl.className = "api-path";
         pathEl.textContent = path;
 
         const actions = document.createElement("div");
         actions.className = "api-card-actions";
-
         const openBtn = document.createElement("button");
-        openBtn.type = "button";
         openBtn.className = "api-open-btn";
         openBtn.innerHTML = '<i class="fas fa-play me-1"></i> Try';
         openBtn.addEventListener("click", () => {
-          openEndpointModal({
-            id,
-            name: item.name,
-            desc: item.desc,
-            method,
-            path,
-            category: cat.name
-          });
+          openEndpointModal({ id, name: item.name, desc: item.desc, method, path, category: cat.name });
         });
 
         actions.appendChild(openBtn);
-        actions.appendChild(favBtn);
         footer.appendChild(pathEl);
         footer.appendChild(actions);
 
         card.appendChild(header);
         card.appendChild(footer);
-
         DOM.apiContent.appendChild(card);
         revealObserver.observe(card);
       });
@@ -500,16 +464,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function updateFavButtonState(btn, id) {
-    if (isFavorite(id)) {
-      btn.classList.add("favorited");
-      btn.innerHTML = '<i class="fas fa-star"></i>';
-    } else {
-      btn.classList.remove("favorited");
-      btn.innerHTML = '<i class="far fa-star"></i>';
-    }
-  }
-
   function applyFilters() {
     if (!DOM.apiContent) return;
     const cards = DOM.apiContent.querySelectorAll(".api-card");
@@ -517,28 +471,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const id = card.dataset.id;
       const cat = card.dataset.category || "uncategorized";
       const name = card.querySelector(".api-card-title")?.textContent.toLowerCase() || "";
-      const desc = card.querySelector(".api-card-desc")?.textContent.toLowerCase() || "";
       const path = card.dataset.path.toLowerCase();
 
-      const matchSearch =
-        !searchText ||
-        name.includes(searchText) ||
-        desc.includes(searchText) ||
-        path.includes(searchText);
-
+      const matchSearch = !searchText || name.includes(searchText) || path.includes(searchText);
       let matchCategory = true;
-      if (currentCategory === "favorites") {
-        matchCategory = isFavorite(id);
-      } else if (currentCategory !== "all") {
-        matchCategory = cat === currentCategory;
-      }
+      if (currentCategory === "favorites") matchCategory = isFavorite(id);
+      else if (currentCategory !== "all") matchCategory = cat === currentCategory;
 
       card.style.display = matchSearch && matchCategory ? "" : "none";
     });
   }
 
   /* -----------------------------
-     MODAL + API REQUEST
+     MODAL & FETCH
   ------------------------------ */
   function openEndpointModal(meta) {
     if (!modalInstance) return;
@@ -558,16 +503,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function sendApiRequest(meta) {
     const url = meta.path || "/";
     const method = meta.method || "GET";
-
-    currentRequestMeta = {
-      ...meta,
-      url,
-      method
-    };
-
-    DOM.modalStatusLine.textContent = "";
-    DOM.responseContent.innerHTML = "";
-
+    DOM.modalStatusLine.textContent = "Sending request...";
     const startedAt = performance.now();
     logLine(`→ ${method} ${url}`);
 
@@ -581,38 +517,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const contentType = res.headers.get("content-type") || "";
         let bodyText = "";
+        
         if (contentType.includes("application/json")) {
           const data = await res.json();
-          const jsonStr = JSON.stringify(data, null, 2);
-          DOM.responseContent.innerHTML = syntaxHighlightJson(jsonStr);
-          bodyText = jsonStr;
+          bodyText = JSON.stringify(data, null, 2);
+          DOM.responseContent.innerHTML = syntaxHighlightJson(bodyText);
         } else if (contentType.startsWith("image/")) {
           const blob = await res.blob();
           const imgUrl = URL.createObjectURL(blob);
-          DOM.responseContent.innerHTML = "";
-          const img = document.createElement("img");
-          img.src = imgUrl;
-          img.alt = "Image response";
-          img.style.maxWidth = "100%";
-          img.style.borderRadius = "10px";
-          DOM.responseContent.appendChild(img);
+          DOM.responseContent.innerHTML = `<img src="${imgUrl}" style="max-width:100%; border-radius:8px;">`;
           bodyText = "[image blob]";
         } else {
-          const txt = await res.text();
-          DOM.responseContent.textContent = txt || "(empty response)";
-          bodyText = txt;
+          bodyText = await res.text();
+          DOM.responseContent.textContent = bodyText || "(empty response)";
         }
-
         logLine(`← ${method} ${url} — ${statusText}`);
         prepareCurl(meta, bodyText);
       })
       .catch(err => {
-        DOM.modalStatusLine.textContent = `Error: ${err.message || "Unknown error"}`;
-        DOM.responseContent.textContent = "Tidak dapat menghubungi server. Periksa kembali endpoint atau server.";
+        DOM.modalStatusLine.textContent = `Error: ${err.message}`;
+        DOM.responseContent.textContent = "Gagal menghubungi server. Endpoint mungkin mati atau CORS block.";
         updateHistory(method, url, "ERR");
         updateStatusPill(url, false);
         logLine(`× ${method} ${url} — ERROR: ${err.message}`);
-        prepareCurl(meta, "");
       })
       .finally(() => {
         DOM.modalLoading.classList.add("d-none");
@@ -624,9 +551,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const li = document.createElement("li");
     li.textContent = `${method} ${url} — ${status}`;
     DOM.historyList.prepend(li);
-    while (DOM.historyList.children.length > 8) {
-      DOM.historyList.removeChild(DOM.historyList.lastChild);
-    }
+    if (DOM.historyList.children.length > 8) DOM.historyList.removeChild(DOM.historyList.lastChild);
   }
 
   function updateStatusPill(path, ok) {
@@ -656,228 +581,56 @@ document.addEventListener("DOMContentLoaded", () => {
   if (DOM.copyCurlBtn) {
     DOM.copyCurlBtn.addEventListener("click", () => {
       const cmd = DOM.copyCurlBtn.dataset.curl || "";
-      if (!cmd) return;
-      navigator.clipboard?.writeText(cmd).catch(() => {});
+      if (cmd) navigator.clipboard?.writeText(cmd);
     });
   }
-
   if (DOM.copyEndpointBtn) {
     DOM.copyEndpointBtn.addEventListener("click", () => {
-      const txt = DOM.endpointText.textContent || "";
-      if (!txt) return;
-      navigator.clipboard?.writeText(txt).catch(() => {});
+      navigator.clipboard?.writeText(DOM.endpointText.textContent || "");
     });
   }
 
   /* -----------------------------
-     LIVE ENDPOINT STATUS PING
+     STATUS PING
   ------------------------------ */
   function pingAllEndpoints() {
     const cards = DOM.apiContent?.querySelectorAll(".api-card") || [];
     cards.forEach(card => {
       const path = card.dataset.path;
       if (!path) return;
-      fetch(path, { method: "GET" })
+      fetch(path, { method: "HEAD" }) // Use HEAD for lighter check
         .then(res => updateStatusPill(path, res.ok))
         .catch(() => updateStatusPill(path, false));
     });
   }
 
   /* -----------------------------
-     SETTINGS LOADING
+     INIT
   ------------------------------ */
   async function loadSettings() {
     try {
-      const res = await fetch("/src/settings.json");
-      if (!res.ok) throw new Error(`Gagal memuat settings.json (${res.status})`);
+      // Added timestamp to prevent caching during dev
+      const res = await fetch(`/src/settings.json?v=${Date.now()}`);
+      if (!res.ok) throw new Error("Settings not found");
       settings = await res.json();
       renderFiltersFromSettings();
       renderApiCards();
       applyFilters();
       pingAllEndpoints();
-      setInterval(pingAllEndpoints, 60_000);
-      logLine("settings.json loaded and endpoints rendered.");
+      setInterval(pingAllEndpoints, 60000);
+      logLine("System ready.");
     } catch (err) {
-      logLine(`Error loading settings.json: ${err.message}`);
+      logLine("Failed loading settings.json");
       if (DOM.apiContent) {
-        DOM.apiContent.textContent = "Gagal memuat konfigurasi API. Pastikan /src/settings.json dapat diakses.";
+        DOM.apiContent.innerHTML = `<div style="text-align:center; padding:2rem; color:#888;">
+          <i class="fas fa-exclamation-triangle fa-2x"></i><br><br>
+          Gagal memuat /src/settings.json.<br>Pastikan file tersedia dan format JSON benar.
+        </div>`;
       }
     }
   }
 
-// ====== DARK MODE + FOLLOW SYSTEM ======
-(function () {
-  const MODE_KEY = 'ada-ui-color-mode'; // 'light' | 'dark'
-  const toggle = document.getElementById('themeToggle');
-
-  function applyMode(mode) {
-    const isDark = mode === 'dark';
-    document.body.classList.toggle('dark-mode', isDark);
-    if (toggle) toggle.checked = isDark;
-  }
-
-  function detectSystemMode() {
-    try {
-      return window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
-    } catch (e) {
-      return 'light';
-    }
-  }
-
-  function initMode() {
-    let stored = null;
-    try {
-      stored = localStorage.getItem(MODE_KEY);
-    } catch (e) {}
-
-    // Kalau belum pernah pilih manual, pakai sistem
-    const initialMode = stored === 'dark' || stored === 'light'
-      ? stored
-      : detectSystemMode();
-
-    applyMode(initialMode);
-
-    // Jika sistem berubah DAN user belum pernah pilih manual, boleh ikut
-    if (!stored && window.matchMedia) {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      try {
-        mq.addEventListener('change', (e) => {
-          const newMode = e.matches ? 'dark' : 'light';
-          applyMode(newMode);
-        });
-      } catch (_) {
-        // Safari lama: fallback
-        mq.addListener((e) => {
-          const newMode = e.matches ? 'dark' : 'light';
-          applyMode(newMode);
-        });
-      }
-    }
-
-    // Bind ke switch
-    if (toggle) {
-      toggle.addEventListener('change', () => {
-        const mode = toggle.checked ? 'dark' : 'light';
-        applyMode(mode);
-        try {
-          localStorage.setItem(MODE_KEY, mode);
-        } catch (e) {}
-      });
-    }
-  }
-
-  // Jalankan setelah DOM siap
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initMode);
-  } else {
-    initMode();
-  }
-})();
   initThemeMode();
   initThemePreset();
   loadSettings();
 });
-// ====== MODE GELAP / TERANG (ikut sistem + switch) ======
-(function () {
-  const MODE_KEY = 'ada-ui-color-mode';
-  const toggle = document.getElementById('themeToggle');
-
-  function applyMode(mode) {
-    const isDark = mode === 'dark';
-    document.body.classList.toggle('dark-mode', isDark);
-    if (toggle) toggle.checked = isDark;
-  }
-
-  function detectSystemMode() {
-    try {
-      return window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
-    } catch {
-      return 'light';
-    }
-  }
-
-  function initMode() {
-    let stored = null;
-    try {
-      stored = localStorage.getItem(MODE_KEY);
-    } catch {}
-
-    const initial =
-      stored === 'dark' || stored === 'light'
-        ? stored
-        : detectSystemMode();
-
-    applyMode(initial);
-
-    // follow system only if user belum override
-    if (!stored && window.matchMedia) {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const handler = e => {
-        const newMode = e.matches ? 'dark' : 'light';
-        applyMode(newMode);
-      };
-      if (mq.addEventListener) mq.addEventListener('change', handler);
-      else mq.addListener(handler);
-    }
-
-    if (toggle) {
-      toggle.addEventListener('change', () => {
-        const mode = toggle.checked ? 'dark' : 'light';
-        applyMode(mode);
-        try {
-          localStorage.setItem(MODE_KEY, mode);
-        } catch {}
-      });
-    }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initMode);
-  } else {
-    initMode();
-  }
-})();
-
-// ====== TEMA (Noir / Emerald / Cyber / Amber) ======
-(function () {
-  const THEME_KEY = 'ada-ui-theme';
-  const select = document.getElementById('themePreset');
-  if (!select) return;
-
-  const THEMES = ['noir', 'emerald-gold', 'cyber-glow', 'royal-amber'];
-
-  function applyTheme(theme) {
-    if (!THEMES.includes(theme)) theme = 'emerald-gold';
-    document.body.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem(THEME_KEY, theme);
-    } catch {}
-  }
-
-  function initTheme() {
-    let stored = null;
-    try {
-      stored = localStorage.getItem(THEME_KEY);
-    } catch {}
-
-    const initial =
-      stored && THEMES.includes(stored) ? stored : 'emerald-gold';
-    applyTheme(initial);
-
-    if ([...select.options].some(o => o.value === initial)) {
-      select.value = initial;
-    }
-  }
-
-  initTheme();
-
-  select.addEventListener('change', () => {
-    applyTheme(select.value);
-  });
-})();
