@@ -124,15 +124,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // sinkron data-theme dengan mode + preset
+  // SELALU set data-theme (buat mode terang & gelap)
   function syncBodyThemeAttr() {
-    if (themeMode === "dark") {
-      const internal = themePresetInternal || "emerald-gold";
-      DOM.body.setAttribute("data-theme", internal);
-    } else {
-      // mode terang: pakai palet default (tanpa data-theme)
-      DOM.body.removeAttribute("data-theme");
-    }
+    const internal = themePresetInternal || "emerald-gold";
+    DOM.body.setAttribute("data-theme", internal);
   }
 
   function applyMode(mode) {
@@ -168,7 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ================================
-  // THEME PRESET (data-theme – hanya utk mode gelap)
+  // THEME PRESET
   // ================================
   const presetMap = {
     emerald: "emerald-gold",
@@ -197,7 +192,6 @@ document.addEventListener("DOMContentLoaded", () => {
       DOM.themePreset.value = selectValue;
     }
 
-    // kalau lagi mode gelap, ganti data-theme, kalau terang biarin kosong
     syncBodyThemeAttr();
   }
 
@@ -359,7 +353,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     saveJSON("ada-api-fav", favorites);
 
-    // update display kalau lagi filter Favorites
     if (DOM.apiFilters) {
       const active = DOM.apiFilters.querySelector(".filter-chip.active");
       if (active && active.dataset.filter === "favorites") {
@@ -401,7 +394,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ================================
-  // VISIBILITY HELPER (filter + search + favorites)
+  // VISIBILITY HELPER
   // ================================
   function applyCombinedVisibility(itemEl) {
     const catMatch = itemEl.dataset.catMatch !== "0";
@@ -421,14 +414,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const catName = itemEl.dataset.category;
       const isFavItem = itemEl.dataset.fav === "1";
 
-      // kategori
       if (activeFilter === "all" || activeFilter === "favorites") {
         itemEl.dataset.catMatch = "1";
       } else {
         itemEl.dataset.catMatch = catName === activeFilter ? "1" : "0";
       }
 
-      // favorites
       if (activeFilter === "favorites") {
         itemEl.dataset.favMatch = isFavItem ? "1" : "0";
       } else {
@@ -571,7 +562,6 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.classList.add("active");
 
       if (filter === "search-tools") {
-        // sementara sama dengan "all"
         applyFilters("all");
       } else {
         applyFilters(filter);
@@ -609,7 +599,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ================================
-  // STATUS PILL (ONLINE / ERROR)
+  // STATUS PILL
   // ================================
   function setStatusPill(el, status) {
     el.classList.remove("status-ok", "status-error", "status-unknown");
@@ -651,7 +641,6 @@ document.addEventListener("DOMContentLoaded", () => {
         .trim()
         .toUpperCase();
 
-      // untuk cek status cukup GET saja supaya aman
       const fetchMethod = method === "GET" ? "GET" : "GET";
 
       setStatusPill(statusEl, "checking");
@@ -692,7 +681,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (modalInstance) modalInstance.show();
 
-    // auto request
     sendApiRequest();
   }
 
@@ -850,7 +838,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       appendLog(`Gagal memuat settings.json: ${err.message}`);
       settings = null;
-      renderApiCategories(); // fallback
+      renderApiCategories();
     }
   }
 
