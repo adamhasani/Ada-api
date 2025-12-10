@@ -12,7 +12,7 @@ module.exports = function(app) {
             });
         }
 
-        // Validasi Link YouTube
+        // Validasi Regex Link YouTube
         const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
         if (!youtubeRegex.test(url)) {
             return res.status(400).json({
@@ -23,30 +23,25 @@ module.exports = function(app) {
         }
 
         try {
-            // === PERBAIKAN UTAMA ADA DI SINI ===
-            // Kita encode URL-nya biar karakter aneh (? & =) aman saat dikirim
             const encodedUrl = encodeURIComponent(url);
-            
             const nekolabsUrl = `https://api.nekolabs.web.id/downloader/youtube/v1?url=${encodedUrl}&format=mp3`;
             
-            // Tambahkan Header biar dikira Browser (Chrome)
             const response = await axios.get(nekolabsUrl, {
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36'
                 }
             });
             
             const data = response.data;
 
-            // Debugging (Opsional: Cek di console server kalau masih error)
-            // console.log("Respon Nekolabs:", data);
-
-            if (!data || !data.status) {
+            // === PERBAIKAN DI SINI ===
+            // Nekolabs pakai 'success', bukan 'status'. Dan isinya di 'result', bukan 'data'.
+            if (!data || !data.success) {
                 return res.status(500).json({
                     status: false,
                     creator: "Ada API",
-                    error: "Gagal mengambil data dari server downloader (Mungkin limit atau IP block).",
-                    debug: data // Tampilkan pesan asli dari Nekolabs biar tau errornya apa
+                    error: "Gagal mengambil data dari server downloader.",
+                    debug: data 
                 });
             }
 
@@ -54,10 +49,17 @@ module.exports = function(app) {
                 status: true,
                 creator: "Ada API",
                 metadata: {
-                    title: data.data.title,
-                    originalUrl: url
+                    title: data.result.title,
+                    originalUrl: url,
+                    duration: data.result.duration,
+                    cover: data.result.cover
                 },
-                result: data.data
+                // Link download ada di data.result.downloadUrl
+                result: {
+                    downloadUrl: data.result.downloadUrl,
+                    quality: data.result.quality,
+                    format: data.result.format
+                }
             });
 
         } catch (error) {
