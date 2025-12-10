@@ -1,4 +1,4 @@
-// Ada API Console – script utama (nyambung ke index.html + settings.json)
+// Ada API Console – script utama (nyambung ke index.html + src/settings.json)
 
 document.addEventListener("DOMContentLoaded", () => {
   // ================================
@@ -561,7 +561,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (modalInstance) modalInstance.show();
 
-    // auto langsung request
+    // langsung auto-request
     sendApiRequest();
   }
 
@@ -727,7 +727,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // INIT
   // ================================
   async function init() {
-    // bersihin placeholder log di HTML (kalau ada)
+    // hapus placeholder log di HTML kalau ada
     if (DOM.logsConsole) DOM.logsConsole.textContent = "";
 
     initMode();
