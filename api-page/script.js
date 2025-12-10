@@ -1,36 +1,46 @@
-// Ada API Console – script utama (nyambung ke index.html + src/settings.json)
+// ADA API UI – script utama (versi diringkas + fix sidebar Beranda)
+// Semua logika: tema, sidebar, search, koleksi endpoint, modal respons, history, WA request.
 
 document.addEventListener("DOMContentLoaded", () => {
-  // ================================
+  // ==========================
   // DOM CACHE
-  // ================================
+  // ==========================
   const DOM = {
     body: document.body,
 
+    // layout / nav
     sideNav: document.querySelector(".side-nav"),
     sideNavLinks: document.querySelectorAll(".side-nav-link"),
-    menuToggle: document.getElementById("menuToggle"),
-    navCollapseBtn: document.getElementById("collapseBtn"),
+    menuToggle: document.querySelector(".menu-toggle"),
+    navCollapseBtn: document.querySelector(".nav-collapse-btn"),
     sidebarBackdrop: document.getElementById("sidebarBackdrop"),
 
+    mainWrapper: document.querySelector(".main-wrapper"),
+
+    // header
     searchInput: document.getElementById("searchInput"),
     clearSearch: document.getElementById("clearSearch"),
 
+    // tema
     themeToggle: document.getElementById("themeToggle"),
     themePreset: document.getElementById("themePreset"),
 
+    // hero
+    versionBadge: document.getElementById("versionBadge"),
+    bannerParallax: document.getElementById("bannerParallax"),
+    cursorGlow: document.getElementById("cursorGlow"),
+
+    // koleksi endpoint
     apiFilters: document.getElementById("apiFilters"),
     apiContent: document.getElementById("apiContent"),
+
+    // request box / history / logs
     apiRequestInput: document.getElementById("apiRequestInput"),
     sendApiRequest: document.getElementById("sendApiRequest"),
     requestHistoryList: document.getElementById("requestHistoryList"),
     logsConsole: document.getElementById("liveLogs"),
 
-    versionBadge: document.getElementById("versionBadge"),
-
-    bannerParallax: document.getElementById("bannerParallax"),
-    cursorGlow: document.getElementById("cursorGlow"),
-
+    // modal respons
     modalEl: document.getElementById("apiResponseModal"),
     modalTitle: document.getElementById("modalTitle"),
     modalSubtitle: document.getElementById("modalSubtitle"),
@@ -44,35 +54,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const modalInstance = DOM.modalEl ? new bootstrap.Modal(DOM.modalEl) : null;
 
-  // ================================
+  // ==========================
   // STATE
-  // ================================
+  // ==========================
   let settings = null;
-  let currentApiItem = null;
-  let favorites = loadJSON("ada-api-fav", []); // array path
-  let historyItems = loadJSON("ada-api-history", []); // {name,path,ts}
-  let themeMode = null; // "light" / "dark"
-  let themePresetInternal = null; // "emerald-gold" / "noir" / ...
+  let favorites = loadJSON("ada-api-favorites", []);   // array of endpoint path
+  let historyItems = loadJSON("ada-api-history", []);  // {name,path,ts}
+  let themeMode = null;                                // 'light' | 'dark'
+  let themePreset = null;                              // 'emerald-gold' | 'noir' | ...
 
-  // fallback kalau settings.json gagal
+  // fallback kalau settings.json gagal dimuat
   const fallbackCategories = [
     {
-      name: "Contoh",
+      name: "General",
       items: [
         {
-          name: "Status API (contoh)",
-          desc: "Contoh endpoint kalau settings.json belum terbaca.",
+          name: "Status API",
+          desc: "Contoh endpoint status Ada API.",
           method: "GET",
-          path: "https://httpbin.org/status/200",
+          path: "https://example.com/status",
           status: "online",
         },
       ],
     },
   ];
 
-  // ================================
+  // ==========================
   // UTIL
-  // ================================
+  // ==========================
   function loadJSON(key, fallback) {
     try {
       const raw = localStorage.getItem(key);
@@ -87,7 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
-      // ignore
+      // abaikan
     }
   }
 
@@ -98,47 +107,60 @@ document.addEventListener("DOMContentLoaded", () => {
     DOM.logsConsole.scrollTop = DOM.logsConsole.scrollHeight;
   }
 
-  function beautifyJSON(text) {
+  function addHistory(entry) {
+    historyItems.unshift({
+      name: entry.name,
+      path: entry.path,
+      ts: Date.now(),
+    });
+    historyItems = historyItems.slice(0, 20);
+    saveJSON("ada-api-history", historyItems);
+    renderHistory();
+  }
+
+  function renderHistory() {
+    if (!DOM.requestHistoryList) return;
+    DOM.requestHistoryList.innerHTML = "";
+    historyItems.forEach((item) => {
+      const li = document.createElement("li");
+      const date = new Date(item.ts);
+      li.textContent = `${date.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })} — ${item.name} (${item.path})`;
+      DOM.requestHistoryList.appendChild(li);
+    });
+  }
+
+  function beautifyJSON(json) {
     try {
-      const obj = JSON.parse(text);
-      return JSON.stringify(obj, null, 2);
+      if (typeof json === "string") json = JSON.parse(json);
+      return JSON.stringify(json, null, 2);
     } catch {
-      return text;
+      return String(json);
     }
   }
 
-  // ================================
-  // THEME MODE (LIGHT / DARK)
-  // ================================
+  // ==========================
+  // MODE TERANG / GELAP
+  // ==========================
   function detectSystemMode() {
     try {
-      if (
-        window.matchMedia &&
+      return window.matchMedia &&
         window.matchMedia("(prefers-color-scheme: dark)").matches
-      ) {
-        return "dark";
-      }
-      return "light";
+        ? "dark"
+        : "light";
     } catch {
       return "light";
     }
-  }
-
-  // SELALU set data-theme (buat mode terang & gelap)
-  function syncBodyThemeAttr() {
-    const internal = themePresetInternal || "emerald-gold";
-    DOM.body.setAttribute("data-theme", internal);
   }
 
   function applyMode(mode) {
     const isDark = mode === "dark";
-    themeMode = mode;
-
     DOM.body.classList.toggle("dark-mode", isDark);
     if (DOM.themeToggle) DOM.themeToggle.checked = isDark;
-
+    themeMode = mode;
     saveJSON("ada-ui-mode", mode);
-    syncBodyThemeAttr();
   }
 
   function initMode() {
@@ -147,12 +169,6 @@ document.addEventListener("DOMContentLoaded", () => {
       applyMode(stored);
     } else {
       applyMode(detectSystemMode());
-      if (window.matchMedia) {
-        const mq = window.matchMedia("(prefers-color-scheme: dark)");
-        const handler = (e) => applyMode(e.matches ? "dark" : "light");
-        if (mq.addEventListener) mq.addEventListener("change", handler);
-        else mq.addListener(handler);
-      }
     }
 
     if (DOM.themeToggle) {
@@ -162,37 +178,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // ================================
+  // ==========================
   // THEME PRESET
-  // ================================
-  const presetMap = {
-    emerald: "emerald-gold",
-    noir: "noir",
-    ivory: "royal-amber",
-    cyber: "cyber-glow",
-    olive: "emerald-gold",
-  };
-
-  const reversePresetMap = {
-    "emerald-gold": "emerald",
-    noir: "noir",
-    "royal-amber": "ivory",
-    "cyber-glow": "cyber",
-  };
-
-  function applyPreset(internalKey) {
-    const allowed = ["emerald-gold", "noir", "royal-amber", "cyber-glow"];
-    if (!allowed.includes(internalKey)) internalKey = "emerald-gold";
-
-    themePresetInternal = internalKey;
-    saveJSON("ada-ui-theme", internalKey);
-
-    if (DOM.themePreset) {
-      const selectValue = reversePresetMap[internalKey] || "emerald";
-      DOM.themePreset.value = selectValue;
-    }
-
-    syncBodyThemeAttr();
+  // ==========================
+  function applyPreset(preset) {
+    const allowed = ["emerald-gold", "noir", "cyber-glow", "royal-amber"];
+    if (!allowed.includes(preset)) preset = "emerald-gold";
+    DOM.body.setAttribute("data-theme", preset);
+    themePreset = preset;
+    saveJSON("ada-ui-theme", preset);
+    if (DOM.themePreset) DOM.themePreset.value = preset;
   }
 
   function initPreset() {
@@ -202,16 +197,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (DOM.themePreset) {
       DOM.themePreset.addEventListener("change", () => {
-        const userValue = DOM.themePreset.value;
-        const internalKey = presetMap[userValue] || "emerald-gold";
-        applyPreset(internalKey);
+        const v = DOM.themePreset.value;
+        applyPreset(v);
       });
     }
   }
 
-  // ================================
+  // ==========================
   // SIDEBAR
-  // ================================
+  // ==========================
   function openSidebarMobile() {
     if (!DOM.sideNav) return;
     DOM.sideNav.classList.add("open");
@@ -232,8 +226,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function initSidebar() {
+    // tombol burger
     if (DOM.menuToggle) {
-      DOM.menuToggle.addEventListener("click", () => {
+      DOM.menuToggle.addEventListener("click", (e) => {
+        e.preventDefault();
         if (window.innerWidth < 992) {
           if (DOM.sideNav.classList.contains("open")) {
             closeSidebarMobile();
@@ -246,24 +242,40 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
+    // tombol panah collapse (desktop)
     if (DOM.navCollapseBtn) {
-      DOM.navCollapseBtn.addEventListener("click", () => {
+      DOM.navCollapseBtn.addEventListener("click", (e) => {
+        e.preventDefault();
         toggleSidebarCollapsedDesktop();
       });
     }
 
+    // backdrop mobile
     if (DOM.sidebarBackdrop) {
       DOM.sidebarBackdrop.addEventListener("click", () => {
         closeSidebarMobile();
       });
     }
 
+    // klik link di sidebar
     DOM.sideNavLinks.forEach((link) => {
       link.addEventListener("click", () => {
-        if (window.innerWidth < 992) closeSidebarMobile();
+        const href = link.getAttribute("href") || "";
+
+        if (window.innerWidth < 992) {
+          // mobile → tutup overlay
+          closeSidebarMobile();
+        } else {
+          // DESKTOP:
+          // FIX #1: kalau klik "Beranda" (section id="home"), paksa sidebar balik normal
+          if (href === "#home" && DOM.sideNav) {
+            DOM.sideNav.classList.remove("collapsed");
+          }
+        }
       });
     });
 
+    // sync ketika resize
     window.addEventListener("resize", () => {
       if (window.innerWidth >= 992 && DOM.sidebarBackdrop) {
         DOM.sidebarBackdrop.classList.remove("show");
@@ -271,6 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
+    // highlight menu aktif saat scroll
     window.addEventListener("scroll", () => {
       const headerOffset = 72;
       const scrollY = window.scrollY + headerOffset;
@@ -289,40 +302,32 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ================================
+  // ==========================
   // SEARCH
-  // ================================
+  // ==========================
   function filterApis(query) {
     query = query.trim().toLowerCase();
-    const itemEls = DOM.apiContent
-      ? DOM.apiContent.querySelectorAll(".api-item")
+    const cards = DOM.apiContent
+      ? DOM.apiContent.querySelectorAll(".api-card")
       : [];
 
-    itemEls.forEach((el) => {
-      const name =
-        el.querySelector(".api-card-title")?.textContent.toLowerCase() || "";
-      const desc =
-        el.querySelector(".api-card-desc")?.textContent.toLowerCase() || "";
-      const path =
-        el.querySelector(".api-path")?.textContent.toLowerCase() || "";
+    if (!query) {
+      cards.forEach((card) => (card.style.display = ""));
+      return;
+    }
 
-      const match =
-        !query ||
-        name.includes(query) ||
-        desc.includes(query) ||
-        path.includes(query);
-
-      el.dataset.searchMatch = match ? "1" : "0";
-      applyCombinedVisibility(el);
+    cards.forEach((card) => {
+      const text = (card.textContent || "").toLowerCase();
+      card.style.display = text.includes(query) ? "" : "none";
     });
   }
 
   function initSearch() {
-    if (DOM.searchInput) {
-      DOM.searchInput.addEventListener("input", () => {
-        filterApis(DOM.searchInput.value);
-      });
-    }
+    if (!DOM.searchInput) return;
+    DOM.searchInput.addEventListener("input", () => {
+      filterApis(DOM.searchInput.value);
+    });
+
     if (DOM.clearSearch) {
       DOM.clearSearch.addEventListener("click", () => {
         DOM.searchInput.value = "";
@@ -331,130 +336,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // ================================
-  // FAVORIT & HISTORY
-  // ================================
-  function isFav(path) {
-    return favorites.includes(path);
-  }
-
-  function toggleFav(path, btn) {
-    const idx = favorites.indexOf(path);
-    const itemEl = btn.closest(".api-item");
-
+  // ==========================
+  // FAVORITES
+  // ==========================
+  function toggleFav(key, button) {
+    const idx = favorites.indexOf(key);
     if (idx >= 0) {
       favorites.splice(idx, 1);
-      btn.classList.remove("favorited");
-      if (itemEl) itemEl.dataset.fav = "0";
+      button.classList.remove("favorited");
     } else {
-      favorites.push(path);
-      btn.classList.add("favorited");
-      if (itemEl) itemEl.dataset.fav = "1";
+      favorites.push(key);
+      button.classList.add("favorited");
     }
-    saveJSON("ada-api-fav", favorites);
-
-    if (DOM.apiFilters) {
-      const active = DOM.apiFilters.querySelector(".filter-chip.active");
-      if (active && active.dataset.filter === "favorites") {
-        applyFilters("favorites");
-      }
-    }
+    saveJSON("ada-api-favorites", favorites);
   }
 
-  function addHistory(item) {
-    historyItems.unshift({
-      name: item.name,
-      path: item.path,
-      ts: new Date().toISOString(),
-    });
-    historyItems = historyItems.slice(0, 20);
-    saveJSON("ada-api-history", historyItems);
-    renderHistory();
-  }
-
-  function renderHistory() {
-    if (!DOM.requestHistoryList) return;
-    DOM.requestHistoryList.innerHTML = "";
-    historyItems.forEach((item) => {
-      const li = document.createElement("li");
-      li.className = "history-item";
-
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "history-name";
-      nameSpan.textContent = item.name;
-
-      const pathSpan = document.createElement("span");
-      pathSpan.className = "history-path";
-      pathSpan.textContent = item.path;
-
-      li.appendChild(nameSpan);
-      li.appendChild(pathSpan);
-      DOM.requestHistoryList.appendChild(li);
-    });
-  }
-
-  // ================================
-  // VISIBILITY HELPER
-  // ================================
-  function applyCombinedVisibility(itemEl) {
-    const catMatch = itemEl.dataset.catMatch !== "0";
-    const favMatch = itemEl.dataset.favMatch !== "0";
-    const searchMatch = itemEl.dataset.searchMatch !== "0";
-
-    const visible = catMatch && favMatch && searchMatch;
-    itemEl.style.display = visible ? "" : "none";
-  }
-
-  function applyFilters(activeFilter) {
-    const items = DOM.apiContent
-      ? DOM.apiContent.querySelectorAll(".api-item")
-      : [];
-
-    items.forEach((itemEl) => {
-      const catName = itemEl.dataset.category;
-      const isFavItem = itemEl.dataset.fav === "1";
-
-      if (activeFilter === "all" || activeFilter === "favorites") {
-        itemEl.dataset.catMatch = "1";
-      } else {
-        itemEl.dataset.catMatch = catName === activeFilter ? "1" : "0";
-      }
-
-      if (activeFilter === "favorites") {
-        itemEl.dataset.favMatch = isFavItem ? "1" : "0";
-      } else {
-        itemEl.dataset.favMatch = "1";
-      }
-
-      if (!itemEl.dataset.searchMatch) itemEl.dataset.searchMatch = "1";
-
-      applyCombinedVisibility(itemEl);
-    });
-  }
-
-  // ================================
-  // RENDER API CARD & FILTER
-  // ================================
-  function buildApiCard(categoryName, item) {
+  // ==========================
+  // BUILD KARTU API
+  // ==========================
+  function buildApiCard(item) {
     const col = document.createElement("div");
-    col.className = "col-12 col-md-6 col-lg-4 api-item";
-    col.dataset.category = categoryName;
-
-    const isFavoriteItem = isFav(item.path);
-    col.dataset.fav = isFavoriteItem ? "1" : "0";
-    col.dataset.catMatch = "1";
-    col.dataset.favMatch = "1";
-    col.dataset.searchMatch = "1";
+    col.className = "api-item";
 
     const card = document.createElement("article");
     card.className = "api-card";
 
+    // header
     const header = document.createElement("div");
     header.className = "api-card-header";
 
-    const title = document.createElement("h4");
+    const title = document.createElement("h3");
     title.className = "api-card-title";
-    title.textContent = item.name;
+    title.textContent = item.name || "Endpoint";
 
     const metaRow = document.createElement("div");
     metaRow.className = "card-meta-row";
@@ -463,17 +376,30 @@ document.addEventListener("DOMContentLoaded", () => {
     methodBadge.className = "http-badge";
     const method = (item.method || "GET").toUpperCase();
     methodBadge.textContent = method;
-    if (method === "POST") methodBadge.classList.add("http-post");
-    else if (method === "PUT") methodBadge.classList.add("http-put");
-    else if (method === "DELETE") methodBadge.classList.add("http-delete");
-    else methodBadge.classList.add("http-get");
+    methodBadge.classList.add(
+      method === "POST"
+        ? "http-post"
+        : method === "PUT"
+        ? "http-put"
+        : method === "DELETE"
+        ? "http-delete"
+        : "http-get"
+    );
 
     const statusBadge = document.createElement("span");
     statusBadge.className = "endpoint-status-pill";
-    statusBadge.dataset.path = item.path || "";
+    const status = (item.status || "unknown").toLowerCase();
 
-    const initialStatus = (item.status || "unknown").toLowerCase();
-    setStatusPill(statusBadge, initialStatus);
+    if (status === "online" || status === "ok") {
+      statusBadge.classList.add("status-ok");
+      statusBadge.textContent = "Online";
+    } else if (status === "error" || status === "down") {
+      statusBadge.classList.add("status-error");
+      statusBadge.textContent = "Error";
+    } else {
+      statusBadge.classList.add("status-unknown");
+      statusBadge.textContent = "Unknown";
+    }
 
     metaRow.appendChild(methodBadge);
     metaRow.appendChild(statusBadge);
@@ -481,16 +407,19 @@ document.addEventListener("DOMContentLoaded", () => {
     header.appendChild(title);
     header.appendChild(metaRow);
 
+    // deskripsi
     const desc = document.createElement("p");
     desc.className = "api-card-desc";
     desc.textContent = item.desc || "";
 
-    const footer = document.createElement("div");
-    footer.className = "api-card-footer";
-
+    // path
     const pathEl = document.createElement("div");
     pathEl.className = "api-path";
-    pathEl.textContent = item.path;
+    pathEl.textContent = item.path || "";
+
+    // footer
+    const footer = document.createElement("div");
+    footer.className = "api-card-footer";
 
     const actions = document.createElement("div");
     actions.className = "api-card-actions";
@@ -503,12 +432,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const favBtn = document.createElement("button");
     favBtn.type = "button";
     favBtn.className = "fav-toggle-btn";
-    favBtn.dataset.path = item.path;
-    favBtn.innerHTML = '<i class="fas fa-star"></i>';
+    const favIcon = document.createElement("i");
+    favIcon.className = "fas fa-star";
+    favBtn.appendChild(favIcon);
 
-    if (isFavoriteItem) {
+    const favKey = item.path || item.name;
+    if (favorites.includes(favKey)) {
       favBtn.classList.add("favorited");
     }
+
+    favBtn.addEventListener("click", () => toggleFav(favKey, favBtn));
+    tryBtn.addEventListener("click", () => openApiModal(item));
 
     actions.appendChild(tryBtn);
     actions.appendChild(favBtn);
@@ -517,250 +451,212 @@ document.addEventListener("DOMContentLoaded", () => {
     footer.appendChild(actions);
 
     card.appendChild(header);
-    card.appendChild(desc);
     card.appendChild(footer);
     col.appendChild(card);
-
-    favBtn.addEventListener("click", () => toggleFav(item.path, favBtn));
-    tryBtn.addEventListener("click", () => openApiModal(item));
+    col.insertBefore(desc, footer);
 
     return col;
   }
 
+  // ==========================
+  // RENDER KATEGORI + FILTER
+  // ==========================
   function renderFilters(categories) {
     if (!DOM.apiFilters) return;
     DOM.apiFilters.innerHTML = "";
 
-    const makeChip = (label, value, isActive = false) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "filter-chip";
-      if (isActive) btn.classList.add("active");
-      btn.textContent = label;
-      btn.dataset.filter = value;
-      DOM.apiFilters.appendChild(btn);
-      return btn;
-    };
-
-    makeChip("Semua", "all", true);
+    // chip default: Favorites
+    const favChip = document.createElement("button");
+    favChip.type = "button";
+    favChip.className = "filter-chip";
+    favChip.textContent = "Favorites";
+    favChip.addEventListener("click", () => {
+      if (!DOM.apiContent) return;
+      const cards = DOM.apiContent.querySelectorAll(".api-card");
+      cards.forEach((card) => {
+        const path = card.querySelector(".api-path")?.textContent || "";
+        card.style.display = favorites.includes(path) ? "" : "none";
+      });
+    });
+    DOM.apiFilters.appendChild(favChip);
 
     categories.forEach((cat) => {
-      makeChip(cat.name, cat.name);
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "filter-chip";
+      chip.textContent = cat.name;
+      chip.addEventListener("click", () => {
+        const targetId = `category-${cat.name
+          .toLowerCase()
+          .replace(/\s+/g, "-")}`;
+        const section = document.getElementById(targetId);
+        if (section) {
+          window.scrollTo({
+            top: section.offsetTop - 80,
+            behavior: "smooth",
+          });
+        }
+      });
+      DOM.apiFilters.appendChild(chip);
     });
-
-    makeChip("Search Tools", "search-tools");
-    makeChip("Favorites", "favorites");
-
-    DOM.apiFilters.onclick = (e) => {
-      const btn = e.target.closest(".filter-chip");
-      if (!btn) return;
-      const filter = btn.dataset.filter;
-
-      DOM.apiFilters
-        .querySelectorAll(".filter-chip")
-        .forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-
-      if (filter === "search-tools") {
-        applyFilters("all");
-      } else {
-        applyFilters(filter);
-      }
-    };
   }
 
   function renderApiCategories() {
     if (!DOM.apiContent) return;
     DOM.apiContent.innerHTML = "";
 
-    const categories =
-      settings &&
-      Array.isArray(settings.categories) &&
-      settings.categories.length
+    let categories =
+      settings && Array.isArray(settings.categories) && settings.categories.length
         ? settings.categories
         : fallbackCategories;
 
     renderFilters(categories);
 
-    const row = document.createElement("div");
-    row.className = "row";
-    categories.forEach((cat) => {
-      const catName = cat.name || "Tanpa Kategori";
-      const items = Array.isArray(cat.items) ? cat.items : [];
+    categories.forEach((category) => {
+      const section = document.createElement("section");
+      section.className = "category-section";
+      section.id = `category-${category.name
+        .toLowerCase()
+        .replace(/\s+/g, "-")}`;
+
+      const header = document.createElement("h3");
+      header.className = "category-header section-title-oldmoney";
+      header.textContent = category.name;
+
+      const row = document.createElement("div");
+      row.className = "row";
+
+      const items = Array.isArray(category.items) ? [...category.items] : [];
+      items.sort((a, b) => a.name.localeCompare(b.name));
+
       items.forEach((item) => {
-        const col = buildApiCard(catName, item);
+        const col = buildApiCard(item);
         row.appendChild(col);
       });
-    });
-    DOM.apiContent.appendChild(row);
 
-    applyFilters("all");
-    checkEndpointStatusForAll();
+      section.appendChild(header);
+      section.appendChild(row);
+      DOM.apiContent.appendChild(section);
+    });
   }
 
-  // ================================
-  // STATUS PILL
-  // ================================
-  function setStatusPill(el, status) {
-    el.classList.remove("status-ok", "status-error", "status-unknown");
-
-    const s = (status || "").toLowerCase();
-
-    if (s === "ok" || s === "online" || s === "ready") {
-      el.classList.add("status-ok");
-      el.textContent = "Online";
-    } else if (s === "error" || s === "down" || s === "failed") {
-      el.classList.add("status-error");
-      el.textContent = "Error";
-    } else if (s === "checking") {
-      el.classList.add("status-unknown");
-      el.textContent = "Checking…";
-    } else {
-      el.classList.add("status-unknown");
-      el.textContent = "Unknown";
+  // ==========================
+  // SETTINGS.JSON
+  // ==========================
+  function populateFromSettings() {
+    if (!settings) return;
+    if (DOM.versionBadge && settings.version) {
+      DOM.versionBadge.textContent = settings.version;
     }
   }
 
-  function checkEndpointStatusForAll() {
-    const items = DOM.apiContent
-      ? DOM.apiContent.querySelectorAll(".api-item")
-      : [];
-    if (!items.length) return;
-
-    items.forEach((itemEl) => {
-      const pathEl = itemEl.querySelector(".api-path");
-      const statusEl = itemEl.querySelector(".endpoint-status-pill");
-      const methodBadge = itemEl.querySelector(".http-badge");
-      if (!pathEl || !statusEl) return;
-
-      const url = (pathEl.textContent || "").trim();
-      if (!url) return;
-
-      const method = (methodBadge?.textContent || "GET")
-        .toString()
-        .trim()
-        .toUpperCase();
-
-      const fetchMethod = method === "GET" ? "GET" : "GET";
-
-      setStatusPill(statusEl, "checking");
-
-      fetch(url, { method: fetchMethod })
-        .then((res) => {
-          if (res.ok) {
-            setStatusPill(statusEl, "online");
-          } else {
-            setStatusPill(statusEl, "error");
-          }
-        })
-        .catch(() => {
-          setStatusPill(statusEl, "error");
-        });
-    });
+  function loadSettings() {
+    fetch("/src/settings.json")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!json) {
+          appendLog("settings.json tidak ditemukan, pakai fallback.");
+          settings = null;
+        } else {
+          settings = json;
+          appendLog("settings.json dimuat.");
+        }
+        populateFromSettings();
+        renderApiCategories();
+      })
+      .catch(() => {
+        appendLog("Gagal memuat settings.json, pakai fallback.");
+        settings = null;
+        renderApiCategories();
+      });
   }
 
-  // ================================
-  // MODAL & REQUEST
-  // ================================
+  // ==========================
+  // MODAL API
+  // ==========================
   function openApiModal(item) {
-    currentApiItem = item;
-    if (!DOM.modalEl) return;
+    if (!modalInstance) return;
 
-    const url = item.path || "";
+    const path = item.path || "";
+    const desc = item.desc || "";
 
-    if (DOM.modalTitle) DOM.modalTitle.textContent = item.name || "Endpoint";
-    if (DOM.modalSubtitle)
-      DOM.modalSubtitle.textContent = item.desc || url || "";
-    if (DOM.endpointText) DOM.endpointText.textContent = url;
-    if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = "";
-    if (DOM.apiResponseContent) DOM.apiResponseContent.textContent = "";
-    if (DOM.modalLoading) DOM.modalLoading.classList.add("d-none");
+    DOM.modalTitle.textContent = item.name || "Respons API";
+    DOM.modalSubtitle.textContent = desc;
+    DOM.endpointText.textContent = path;
+    DOM.apiResponseContent.textContent = "";
+    DOM.modalStatusLine.textContent = "";
+    DOM.modalLoading.classList.remove("d-none");
 
-    addHistory({ name: item.name || "Endpoint", path: url });
-    appendLog(`Open modal for ${item.name} -> ${url}`);
+    modalInstance.show();
 
-    if (modalInstance) modalInstance.show();
-
-    sendApiRequest();
-  }
-
-  async function sendApiRequest() {
-    if (!currentApiItem) return;
-    const method = (currentApiItem.method || "GET").toUpperCase();
-    const url = currentApiItem.path || "";
-
-    if (!url) return;
-
-    if (DOM.modalStatusLine) {
-      DOM.modalStatusLine.textContent = "Mengirim permintaan…";
+    if (!path) {
+      DOM.modalLoading.classList.add("d-none");
+      DOM.apiResponseContent.textContent = "Endpoint tidak tersedia.";
+      return;
     }
-    if (DOM.modalLoading) DOM.modalLoading.classList.remove("d-none");
-    if (DOM.apiResponseContent) DOM.apiResponseContent.textContent = "";
 
-    appendLog(`Request ${method} ${url}`);
+    appendLog(`Request: ${path}`);
+    addHistory({ name: item.name || "Unknown", path });
 
-    try {
-      const res = await fetch(url, { method });
-      const text = await res.text();
-      const pretty = beautifyJSON(text);
+    fetch(path)
+      .then(async (res) => {
+        let bodyText;
+        try {
+          const clone = res.clone();
+          bodyText = await clone.text();
+        } catch {
+          bodyText = null;
+        }
 
-      if (DOM.apiResponseContent) {
-        DOM.apiResponseContent.textContent = pretty;
-      }
-      if (DOM.modalStatusLine) {
-        DOM.modalStatusLine.textContent = `Status: ${res.status} ${
-          res.ok ? "(OK)" : "(Error)"
-        }`;
-      }
-      appendLog(`Response ${res.status} untuk ${url}`);
-    } catch (err) {
-      if (DOM.apiResponseContent) {
+        let parsed;
+        try {
+          parsed = await res.json();
+        } catch {
+          parsed = bodyText || "Tidak dapat membaca respons.";
+        }
+
+        DOM.modalLoading.classList.add("d-none");
+        DOM.modalStatusLine.textContent = `Status: ${res.status} ${res.statusText}`;
+        DOM.apiResponseContent.textContent = beautifyJSON(parsed);
+        appendLog(`Response ${res.status} untuk ${path}`);
+      })
+      .catch((err) => {
+        DOM.modalLoading.classList.add("d-none");
+        DOM.modalStatusLine.textContent = "Gagal menghubungi server.";
         DOM.apiResponseContent.textContent = String(err);
-      }
-      if (DOM.modalStatusLine) {
-        DOM.modalStatusLine.textContent = "Gagal melakukan request.";
-      }
-      appendLog(`Error: ${err.message}`);
-    } finally {
-      if (DOM.modalLoading) DOM.modalLoading.classList.add("d-none");
-    }
+        appendLog(`ERROR request ${path}: ${err}`);
+      });
   }
 
-  function initModalEvents() {
-    if (DOM.copyEndpointBtn && DOM.endpointText) {
-      DOM.copyEndpointBtn.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(DOM.endpointText.textContent);
-        } catch {
-          // ignore
-        }
-      });
-    }
-
-    if (DOM.copyCurlBtn) {
-      DOM.copyCurlBtn.addEventListener("click", async () => {
-        if (!currentApiItem) return;
-        const method = (currentApiItem.method || "GET").toUpperCase();
-        const url = currentApiItem.path || "";
-        const curl = `curl -X ${method} "${url}"`;
-        try {
-          await navigator.clipboard.writeText(curl);
-        } catch {
-          // ignore
-        }
-      });
-    }
+  if (DOM.copyEndpointBtn) {
+    DOM.copyEndpointBtn.addEventListener("click", () => {
+      const text = DOM.endpointText.textContent || "";
+      if (!text) return;
+      navigator.clipboard.writeText(text).catch(() => {});
+    });
   }
 
-  // ================================
+  if (DOM.copyCurlBtn) {
+    DOM.copyCurlBtn.addEventListener("click", () => {
+      const endpoint = DOM.endpointText.textContent || "";
+      if (!endpoint) return;
+      const curl = `curl -X GET "${endpoint}"`;
+      navigator.clipboard.writeText(curl).catch(() => {});
+    });
+  }
+
+  // ==========================
   // REQUEST BOX → WHATSAPP
-  // ================================
+  // ==========================
   function initRequestBox() {
     if (!DOM.apiRequestInput || !DOM.sendApiRequest) return;
 
     DOM.sendApiRequest.addEventListener("click", () => {
       const text = DOM.apiRequestInput.value.trim();
-      if (!text) return;
+      if (!text) {
+        alert("Isi dulu ide endpoint yang mau kamu request.");
+        return;
+      }
       const waNumber = "6287751121269";
       const url =
         "https://wa.me/" +
@@ -773,95 +669,46 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ================================
-  // FX: CURSOR GLOW & BANNER
-  // ================================
-  function initCursorGlow() {
-    if (!DOM.cursorGlow) return;
-    window.addEventListener("pointermove", (e) => {
-      const x = e.clientX;
-      const y = e.clientY;
-      DOM.cursorGlow.style.transform = `translate(${x}px, ${y}px)`;
-    });
-  }
+  // ==========================
+  // FX: PARALLAX & CURSOR GLOW (optional)
+  // ==========================
+  function initFx() {
+    if (DOM.bannerParallax) {
+      DOM.bannerParallax.addEventListener("mousemove", (e) => {
+        const rect = DOM.bannerParallax.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width - 0.5;
+        const y = (e.clientY - rect.top) / rect.height - 0.5;
+        DOM.bannerParallax.style.transform = `translateY(-2px) perspective(800px) rotateX(${
+          y * -4
+        }deg) rotateY(${x * 4}deg)`;
+      });
 
-  function initBannerParallax() {
-    if (!DOM.bannerParallax) return;
-    DOM.bannerParallax.addEventListener("mousemove", (e) => {
-      const rect = DOM.bannerParallax.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-      const img = DOM.bannerParallax.querySelector(".banner-oldmoney");
-      if (!img) return;
-      img.style.transform = `translate(${x * 12}px, ${y * 8}px) scale(1.02)`;
-    });
-    DOM.bannerParallax.addEventListener("mouseleave", () => {
-      const img = DOM.bannerParallax.querySelector(".banner-oldmoney");
-      if (!img) return;
-      img.style.transform = "translate(0,0) scale(1)";
-    });
-  }
+      DOM.bannerParallax.addEventListener("mouseleave", () => {
+        DOM.bannerParallax.style.transform = "";
+      });
+    }
 
-  function initScrollReveal() {
-    const revealEls = document.querySelectorAll(".reveal");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("reveal-visible");
-          }
-        });
-      },
-      { threshold: 0.08 }
-    );
-    revealEls.forEach((el) => observer.observe(el));
-  }
-
-  // ================================
-  // SETTINGS.JSON → HERO & API
-  // ================================
-  function applySettingsToHero() {
-    if (!settings) return;
-    if (DOM.versionBadge && settings.version) {
-      DOM.versionBadge.textContent = settings.version;
+    if (DOM.cursorGlow) {
+      document.addEventListener("pointermove", (e) => {
+        DOM.cursorGlow.style.transform = `translate(${e.clientX - 180}px, ${
+          e.clientY - 180
+        }px)`;
+      });
     }
   }
 
-  async function loadSettings() {
-    try {
-      const res = await fetch("/src/settings.json");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      settings = await res.json();
-      appendLog("settings.json loaded.");
-      applySettingsToHero();
-      renderApiCategories();
-    } catch (err) {
-      appendLog(`Gagal memuat settings.json: ${err.message}`);
-      settings = null;
-      renderApiCategories();
-    }
-  }
-
-  // ================================
+  // ==========================
   // INIT
-  // ================================
-  async function init() {
-    if (DOM.logsConsole) DOM.logsConsole.textContent = "";
-
+  // ==========================
+  function init() {
     initMode();
     initPreset();
     initSidebar();
     initSearch();
-    initModalEvents();
     initRequestBox();
-    initCursorGlow();
-    initBannerParallax();
-    initScrollReveal();
+    initFx();
     renderHistory();
-
-    appendLog("Menyiapkan konsol Ada API…");
-    await loadSettings();
-    appendLog("Ada API Console siap.");
+    loadSettings();
   }
 
   init();

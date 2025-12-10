@@ -1363,3 +1363,36 @@ body.dark-mode .btn-close i {
     padding-right: 0;
   }
 }
+/* ===== FIX JARAK ATAS SECTION KOLEKSI ===== */
+.section-header-line {
+  margin-top: 1.2rem;   /* dari 2.2rem jadi lebih rapat */
+}
+
+.section-header-line.small {
+  margin-top: 0.8rem;   /* kalau ada yang pakai versi .small juga ikut rapat */
+}
+
+/* khusus mobile bisa lebih rapat lagi kalau mau */
+@media (max-width: 767.98px) {
+  .section-header-line {
+    margin-top: 0.8rem;
+  }
+}
+/* ============================================
+   FIX TEKS GELAP DI MODE DARK + CYBER GLOW
+   ============================================ */
+
+/* Teks deskripsi di kartu API */
+body.dark-mode .api-card-desc {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Teks path (URL) */
+body.dark-mode .api-path {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+/* Judul kartu tetap putih */
+body.dark-mode .api-card-title {
+  color: #ffffff !important;
+}
