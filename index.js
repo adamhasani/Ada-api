@@ -6,44 +6,52 @@ const bodyParser = require('body-parser');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware Wajib
+// Middleware
 app.enable('trust proxy');
 app.set("json spaces", 2);
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// --- PENTING: IZINKAN AKSES FILE STATIS ---
-// Baris ini yang bikin settings.json dan script.js bisa dibaca oleh browser
-app.use(express.static('.')); 
-app.use('/src', express.static(path.join(__dirname, 'src')));
+// --- PERBAIKAN STATIC FILES UNTUK VERCEL ---
+// Gunakan process.cwd() agar file script.js/settings.json terbaca
+app.use(express.static(process.cwd())); 
+app.use('/src', express.static(path.join(process.cwd(), 'src')));
 
 // --- LOAD ROUTES API ---
-// Pastikan file-file ini ADA di foldernya. Kalau tidak ada, hapus barisnya biar gak error.
 try {
+    // Pastikan path require ini SESUAI dengan struktur folder kamu
+    // Kalau salah satu file ini tidak ada, hapus barisnya!
+    
     // 1. Downloaders
     require('./src/api/download/ytmp3')(app);
     
-    // 2. Tools & Upload
+    // 2. Tools
     require('./src/api/tools/tourl')(app);
     
-    // 3. Random Images (Pastikan nama filenya ba.js atau bluearchive.js)
-    // Cek folder src/api/random/ kamu, namanya apa? Sesuaikan di sini.
+    // 3. Random (Pilih salah satu sesuai nama file kamu: ba.js atau bluearchive.js)
     // require('./src/api/random/ba')(app); 
-    // ATAU
-    require('./src/api/random/bluearchive')(app); 
+    require('./src/api/random/bluearchive')(app);
 
-    // 4. AI (Kalau ada)
+    // 4. AI (Jika ada)
     // require('./src/api/ai/luminai')(app);
     
-    console.log("✅ Semua Route Berhasil Dimuat");
+    console.log("✅ Routes Loaded");
 } catch (error) {
-    console.log("⚠️ Ada Route yang Error/Hilang (Cek nama file):", error.message);
+    console.log("⚠️ Route Error:", error.message);
 }
 
-// --- HALAMAN UTAMA ---
+// --- HALAMAN UTAMA (FIX NOT FOUND) ---
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    // Gunakan process.cwd() untuk menemukan index.html
+    const indexPath = path.join(process.cwd(), 'index.html');
+    
+    // Cek apakah file ada sebelum dikirim (opsional tapi aman)
+    res.sendFile(indexPath, (err) => {
+        if (err) {
+            res.status(500).send("Error loading index.html: " + err.message);
+        }
+    });
 });
 
 // Jalankan Server
