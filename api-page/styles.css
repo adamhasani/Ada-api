@@ -263,7 +263,6 @@ main {
   width: calc(100% - 70px);
 }
 
-/* ...lanjut di PART 2... */
 /* ===== SIDEBAR DETAIL ===== */
 
 .side-nav.collapsed {
@@ -800,10 +799,11 @@ body.dark-mode .tag-chip {
   background: #4fe28f;
   box-shadow: 0 0 8px rgba(79, 226, 143, 0.9);
 }
+
 /* ========== SECTION HEADERS ========== */
 
 .section-header-line {
-  margin-top: 2.2rem;
+  margin-top: 1.2rem;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -811,7 +811,7 @@ body.dark-mode .tag-chip {
 }
 
 .section-header-line.small {
-  margin-top: 2rem;
+  margin-top: 0.8rem;
 }
 
 .section-title-oldmoney,
@@ -1018,7 +1018,7 @@ body.dark-mode .section-description {
   gap: 0.4rem;
 }
 
-/* TRY BUTTON */
+/* GET API BUTTON */
 .api-open-btn {
   border-radius: 999px;
   border: 1px solid rgba(27, 38, 32, 0.2);
@@ -1027,6 +1027,28 @@ body.dark-mode .section-description {
   background: rgba(255, 255, 255, 0.96);
   color: #2f2c24;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* DOWNLOAD BUTTON (baru) */
+.api-download-btn {
+  border-radius: 999px;
+  padding: 0.25rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  border: 1px solid rgba(27, 38, 32, 0.16);
+  background: rgba(255, 255, 255, 0.92);
+  color: #2f2c24;
+}
+
+body.dark-mode .api-download-btn {
+  border-color: rgba(151, 213, 172, 0.5);
+  background: rgba(10, 14, 11, 0.98);
+  color: #f5efe2;
 }
 
 /* FAVORITE BUTTON */
@@ -1052,6 +1074,7 @@ body.dark-mode .section-description {
 .api-item {
   margin-bottom: 1rem;
 }
+
 /* ========== REQUEST SECTION ========== */
 
 .request-section {
@@ -1325,6 +1348,7 @@ body.dark-mode .btn-close i {
     "Courier New", monospace;
   font-size: 0.78rem;
 }
+
 /* ========== SCROLL REVEAL ========== */
 
 .reveal {
@@ -1363,21 +1387,7 @@ body.dark-mode .btn-close i {
     padding-right: 0;
   }
 }
-/* ===== FIX JARAK ATAS SECTION KOLEKSI ===== */
-.section-header-line {
-  margin-top: 1.2rem;   /* dari 2.2rem jadi lebih rapat */
-}
 
-.section-header-line.small {
-  margin-top: 0.8rem;   /* kalau ada yang pakai versi .small juga ikut rapat */
-}
-
-/* khusus mobile bisa lebih rapat lagi kalau mau */
-@media (max-width: 767.98px) {
-  .section-header-line {
-    margin-top: 0.8rem;
-  }
-}
 /* ============================================
    FIX TEKS GELAP DI MODE DARK + CYBER GLOW
    ============================================ */
