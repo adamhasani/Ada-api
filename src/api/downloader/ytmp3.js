@@ -2,10 +2,8 @@ const axios = require('axios');
 
 module.exports = function(app) {
     app.get('/api/download/ytmp3', async (req, res) => {
-        // Kita ubah jadi menangkap parameter 'url'
         const url = req.query.url;
 
-        // 1. Cek apakah ada parameter url
         if (!url) {
             return res.status(400).json({
                 status: false,
@@ -14,30 +12,44 @@ module.exports = function(app) {
             });
         }
 
-        // 2. Validasi: Apakah ini beneran Link YouTube?
+        // Validasi Link YouTube
         const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
         if (!youtubeRegex.test(url)) {
             return res.status(400).json({
                 status: false,
                 creator: "Ada API",
-                error: "Invalid YouTube URL. Harap masukkan link YouTube yang valid."
+                error: "Invalid YouTube URL."
             });
         }
 
         try {
-            // 3. Langsung tembak ke Nekolabs karena URL sudah valid
-            const nekolabsUrl = `https://api.nekolabs.web.id/downloader/youtube/v1?url=${url}&format=mp3`;
-            const response = await axios.get(nekolabsUrl);
+            // === PERBAIKAN UTAMA ADA DI SINI ===
+            // Kita encode URL-nya biar karakter aneh (? & =) aman saat dikirim
+            const encodedUrl = encodeURIComponent(url);
+            
+            const nekolabsUrl = `https://api.nekolabs.web.id/downloader/youtube/v1?url=${encodedUrl}&format=mp3`;
+            
+            // Tambahkan Header biar dikira Browser (Chrome)
+            const response = await axios.get(nekolabsUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+            });
+            
             const data = response.data;
+
+            // Debugging (Opsional: Cek di console server kalau masih error)
+            // console.log("Respon Nekolabs:", data);
 
             if (!data || !data.status) {
                 return res.status(500).json({
                     status: false,
-                    error: "Gagal mengambil data dari server downloader."
+                    creator: "Ada API",
+                    error: "Gagal mengambil data dari server downloader (Mungkin limit atau IP block).",
+                    debug: data // Tampilkan pesan asli dari Nekolabs biar tau errornya apa
                 });
             }
 
-            // 4. Kirim Hasil
             res.status(200).json({
                 status: true,
                 creator: "Ada API",
