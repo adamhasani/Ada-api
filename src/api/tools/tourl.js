@@ -2,44 +2,49 @@ const axios = require('axios');
 const multer = require('multer');
 const FormData = require('form-data');
 
-// Setup Multer (Simpan di RAM)
+// Setup Multer (Limit 10MB biar aman di Vercel, meski Vercel max 4.5MB di free tier)
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 15 * 1024 * 1024 } // Naikkan limit ke 15MB
+    limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// --- FUNGSI UPLOAD KE CATBOX (PRIORITAS 1) ---
-async function uploadToCatbox(fileBuffer, fileName) {
+// --- 1. UPLOAD KE CATBOX (Tahan Lama) ---
+async function uploadToCatbox(buffer, filename) {
     const form = new FormData();
     form.append('reqtype', 'fileupload');
-    form.append('fileToUpload', fileBuffer, fileName);
-
-    const response = await axios.post('https://catbox.moe/user/api.php', form, {
-        headers: { ...form.getHeaders(), 'User-Agent': 'Mozilla/5.0 (AdaAPI/1.0)' }
-    });
-    
-    // Catbox return text raw link
-    if (response.data && response.data.includes('catbox.moe')) {
-        return response.data;
-    }
-    throw new Error("Gagal upload ke Catbox");
+    form.append('fileToUpload', buffer, filename);
+    const res = await axios.post('https://catbox.moe/user/api.php', form, { headers: form.getHeaders() });
+    if (res.data && res.data.includes('catbox.moe')) return res.data.trim();
+    throw new Error("Catbox Failed");
 }
 
-// --- FUNGSI UPLOAD KE YUPRA (CADANGAN/FALLBACK) ---
-async function uploadToYupra(fileBuffer, fileName) {
+// --- 2. UPLOAD KE UGUU.SE (Cocok buat Document/Temp) ---
+async function uploadToUguu(buffer, filename) {
     const form = new FormData();
-    form.append('file', fileBuffer, fileName);
+    form.append('files[]', buffer, filename); // Key-nya files[]
+    const res = await axios.post('https://uguu.se/upload.php', form, { headers: form.getHeaders() });
+    if (res.data && res.data.success) return res.data.files[0].url;
+    throw new Error("Uguu Failed");
+}
 
-    const response = await axios.post('https://cdn.yupra.my.id/upload', form, {
-        headers: { ...form.getHeaders(), 'User-Agent': 'Mozilla/5.0 (AdaAPI/1.0)' }
-    });
+// --- 3. UPLOAD KE POMF.LAIN.LA (Stabil buat file aneh) ---
+async function uploadToPomf(buffer, filename) {
+    const form = new FormData();
+    form.append('files[]', buffer, filename);
+    const res = await axios.post('https://pomf.lain.la/upload.php', form, { headers: form.getHeaders() });
+    if (res.data && res.data.success) return res.data.files[0].url;
+    throw new Error("Pomf Failed");
+}
 
-    // Cek respon JSON Yupra
-    const data = response.data;
+// --- 4. UPLOAD KE YUPRA (Cadangan Terakhir) ---
+async function uploadToYupra(buffer, filename) {
+    const form = new FormData();
+    form.append('file', buffer, filename);
+    const res = await axios.post('https://cdn.yupra.my.id/upload', form, { headers: form.getHeaders() });
+    const data = res.data;
     const url = data.url || (data.files && data.files[0]?.url) || data.link;
-    
     if (url) return url;
-    throw new Error("Gagal upload ke Yupra");
+    throw new Error("Yupra Failed");
 }
 
 module.exports = function(app) {
@@ -47,42 +52,61 @@ module.exports = function(app) {
         try {
             const file = req.file;
             if (!file) {
+                return res.status(400).json({ status: false, creator: "Ada API", error: "File tidak ditemukan." });
+            }
+
+            // CEK UKURAN FILE (Vercel Free Limit Body ~4.5MB)
+            // Kalau lebih dari 4.5MB, Vercel otomatis mutus koneksi (Error 413/500 dari sistem, bukan script)
+            if (file.size > 4.5 * 1024 * 1024) {
                 return res.status(400).json({
                     status: false,
                     creator: "Ada API",
-                    error: "File tidak ditemukan. Kirim via form-data dengan key 'file'."
+                    error: "File terlalu besar! Batas Vercel Free adalah 4.5MB."
                 });
             }
 
             let resultUrl = null;
-            let usedServer = "";
+            let serverName = "";
 
-            // LOGIKA FALLBACK (Coba satu-satu)
+            // LOGIKA "TANK": Coba satu per satu sampai berhasil
             try {
-                // 1. Coba Catbox dulu
+                // Prioritas 1: Catbox
                 resultUrl = await uploadToCatbox(file.buffer, file.originalname);
-                usedServer = "Catbox";
-            } catch (errCatbox) {
-                console.log("Catbox error, beralih ke Yupra...", errCatbox.message);
+                serverName = "Catbox";
+            } catch (e1) {
                 try {
-                    // 2. Kalau Catbox gagal, Coba Yupra
-                    resultUrl = await uploadToYupra(file.buffer, file.originalname);
-                    usedServer = "Yupra";
-                } catch (errYupra) {
-                    // 3. Kalau dua-duanya gagal, nyerah
-                    throw new Error("Semua server upload (Catbox & Yupra) sedang down.");
+                    // Prioritas 2: Uguu.se
+                    console.log("Catbox skip, trying Uguu...");
+                    resultUrl = await uploadToUguu(file.buffer, file.originalname);
+                    serverName = "Uguu.se";
+                } catch (e2) {
+                    try {
+                        // Prioritas 3: Pomf
+                        console.log("Uguu skip, trying Pomf...");
+                        resultUrl = await uploadToPomf(file.buffer, file.originalname);
+                        serverName = "Pomf.lain.la";
+                    } catch (e3) {
+                        try {
+                            // Prioritas 4: Yupra
+                            console.log("Pomf skip, trying Yupra...");
+                            resultUrl = await uploadToYupra(file.buffer, file.originalname);
+                            serverName = "Yupra";
+                        } catch (e4) {
+                            // Semua Gagal
+                            throw new Error("Semua server (Catbox, Uguu, Pomf, Yupra) menolak file ini.");
+                        }
+                    }
                 }
             }
 
-            // Kirim Hasil
             res.status(200).json({
                 status: true,
                 creator: "Ada API",
                 result: {
                     name: file.originalname,
-                    size: file.size,
                     mime: file.mimetype,
-                    server: usedServer, // Biar tau file masuk ke server mana
+                    size: file.size,
+                    server: serverName,
                     url: resultUrl
                 }
             });
@@ -91,7 +115,7 @@ module.exports = function(app) {
             console.error(error);
             res.status(500).json({ 
                 status: false, 
-                error: error.message || "Internal Server Error" 
+                error: error.message 
             });
         }
     });
