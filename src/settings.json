@@ -78,6 +78,21 @@
           }
         }
       ]
+    },
+    {
+      "name": "Tools",
+      "items": [
+        {
+          "name": "Tourl (Upload)",
+          "desc": "Upload File/Gambar menjadi Link URL (Auto Fallback Catbox/Yupra).",
+          "path": "/api/tools/tourl",
+          "status": "ready",
+          "method": "POST",
+          "params": {
+            "file": "Media (Image/Video/Doc)"
+          }
+        }
+      ]
     }
   ]
 }
