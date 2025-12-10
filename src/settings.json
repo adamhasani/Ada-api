@@ -38,6 +38,22 @@
       ]
     },
     {
+      "name": "Downloader",
+      "items": [
+        {
+          "name": "YouTube MP3",
+          "desc": "Download Audio YouTube (Auto Search/Link).",
+          "path": "/api/download/ytmp3?q=dj%20malam%20pagi",
+          "status": "ready",
+          "method": "GET",
+          "params": {
+            "q": "Judul lagu atau Link YouTube",
+            "url": "Opsional (bisa pakai parameter 'q' saja)"
+          }
+        }
+      ]
+    },
+    {
       "name": "Random",
       "items": [
         {
