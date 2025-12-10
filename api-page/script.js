@@ -660,7 +660,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ================================
-  // MODAL & REQUEST
+  // MODAL & REQUEST (MODIFIED FOR IMAGE SUPPORT)
   // ================================
   function openApiModal(item) {
     currentApiItem = item;
@@ -673,7 +673,7 @@ document.addEventListener("DOMContentLoaded", () => {
       DOM.modalSubtitle.textContent = item.desc || url || "";
     if (DOM.endpointText) DOM.endpointText.textContent = url;
     if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = "";
-    if (DOM.apiResponseContent) DOM.apiResponseContent.textContent = "";
+    if (DOM.apiResponseContent) DOM.apiResponseContent.innerHTML = ""; // Bersihkan
     if (DOM.modalLoading) DOM.modalLoading.classList.add("d-none");
 
     addHistory({ name: item.name || "Endpoint", path: url });
@@ -695,24 +695,45 @@ document.addEventListener("DOMContentLoaded", () => {
       DOM.modalStatusLine.textContent = "Mengirim permintaan…";
     }
     if (DOM.modalLoading) DOM.modalLoading.classList.remove("d-none");
-    if (DOM.apiResponseContent) DOM.apiResponseContent.textContent = "";
+    if (DOM.apiResponseContent) DOM.apiResponseContent.innerHTML = "";
 
     appendLog(`Request ${method} ${url}`);
 
     try {
       const res = await fetch(url, { method });
-      const text = await res.text();
-      const pretty = beautifyJSON(text);
+      
+      // Deteksi Content-Type
+      const contentType = res.headers.get("content-type");
 
-      if (DOM.apiResponseContent) {
+      // Jika gambar, render <img>
+      if (contentType && contentType.startsWith("image/")) {
+        const blob = await res.blob();
+        const imageUrl = URL.createObjectURL(blob);
+
+        const img = document.createElement("img");
+        img.src = imageUrl;
+        img.alt = "API Response Image";
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        img.style.borderRadius = "8px";
+        img.style.marginTop = "10px";
+        img.style.border = "1px solid var(--border-color)";
+
+        DOM.apiResponseContent.appendChild(img);
+      } 
+      // Jika teks/JSON
+      else {
+        const text = await res.text();
+        const pretty = beautifyJSON(text);
         DOM.apiResponseContent.textContent = pretty;
       }
+
       if (DOM.modalStatusLine) {
         DOM.modalStatusLine.textContent = `Status: ${res.status} ${
           res.ok ? "(OK)" : "(Error)"
         }`;
       }
-      appendLog(`Response ${res.status} untuk ${url}`);
+      appendLog(`Response ${res.status} untuk ${url} (${contentType || 'unknown'})`);
     } catch (err) {
       if (DOM.apiResponseContent) {
         DOM.apiResponseContent.textContent = String(err);
