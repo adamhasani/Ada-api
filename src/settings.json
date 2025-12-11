@@ -1,7 +1,7 @@
 {
   "name": "Ada API (vace)",
   "version": "v1.2",
-  "description": "Simple and easy API for developers (proxied via Vercel api).",
+  "description": "Simple and easy API for developers.",
   "bannerImage": "/src/banner.jpg",
   "categories": [
     {
@@ -9,21 +9,19 @@
       "items": [
         {
           "name": "YouTube MP3",
-          "desc": "Convert YouTube video to MP3. (user will be asked for video link)",
+          "desc": "Convert YouTube video to MP3.",
           "method": "GET",
-          "path": "https://ada-api-vace.vercel.app/api/ytmp3?url=https://youtu.be/eP3UsuxK30U?si=_fqzOY-KTLctC6pr",
+          "path": "https://ada-api-vace.vercel.app/api/ytmp3?url=LINK_YT",
           "status": "ready",
-          "download": "https://ada-api-vace.vercel.app/api/ytmp3?url={query}&direct=1",
-          "params": { "url": "url=" }
+          "params": { "url": "Link YouTube" }
         },
         {
           "name": "YouTube MP4",
-          "desc": "Download YouTube video as MP4. (user will be asked for video link)",
+          "desc": "Download YouTube video as MP4.",
           "method": "GET",
-          "path": "https://ada-api-vace.vercel.app/api/ytmp4?url=",
+          "path": "https://ada-api-vace.vercel.app/api/ytmp4?url=LINK_YT",
           "status": "ready",
-          "download": "https://ada-api-vace.vercel.app/api/ytmp4?url={query}&direct=1",
-          "params": { "url": "url=" }
+          "params": { "url": "Link YouTube" }
         }
       ]
     },
@@ -32,12 +30,11 @@
       "items": [
         {
           "name": "YouTube Search",
-          "desc": "Search YouTube videos (proxied).",
+          "desc": "Search YouTube videos.",
           "method": "GET",
-          "path": "https://ada-api-vace.vercel.app/api/search/yt?q=",
+          "path": "https://ada-api-vace.vercel.app/api/search/yt?q=lagu galau",
           "status": "ready",
-          "download": "",
-          "params": { "query": "q=" }
+          "params": { "q": "Judul Lagu" }
         }
       ]
     }
