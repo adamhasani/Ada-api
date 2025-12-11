@@ -1,5 +1,4 @@
-// script.js — Ada API Console
-// Full: modal safety, download prompt + head check, improved sendApiRequest, fix scroll
+// Ada API Console – script utama (nyambung ke index.html + src/settings.json)
 
 document.addEventListener("DOMContentLoaded", () => {
   // ================================
@@ -7,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ================================
   const DOM = {
     body: document.body,
+
     sideNav: document.querySelector(".side-nav"),
     sideNavLinks: document.querySelectorAll(".side-nav-link"),
     menuToggle: document.getElementById("menuToggle"),
@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bannerParallax: document.getElementById("bannerParallax"),
     cursorGlow: document.getElementById("cursorGlow"),
 
-    // modal elements (expected to exist in index.html)
+    // modal respons
     modalEl: document.getElementById("apiResponseModal"),
     modalTitle: document.getElementById("modalTitle"),
     modalSubtitle: document.getElementById("modalSubtitle"),
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
     copyCurlBtn: document.getElementById("copyCurlBtn")
   };
 
-  // bootstrap modal instance (if bootstrap present)
+  // bootstrap modal (kalau ada)
   let modalInstance = null;
   if (DOM.modalEl && window.bootstrap && bootstrap.Modal) {
     modalInstance = bootstrap.Modal.getOrCreateInstance(DOM.modalEl);
@@ -54,10 +54,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // ================================
   let settings = null;
   let currentApiItem = null;
-  let favorites = loadJSON("ada-api-fav", []);
-  let historyItems = loadJSON("ada-api-history", []);
-  let themeMode = null;
-  let themePresetInternal = null;
+  let favorites = loadJSON("ada-api-fav", []);   // array path
+  let historyItems = loadJSON("ada-api-history", []); // {name,path,ts}
+  let themeMode = null;                          // 'light' | 'dark'
+  let themePresetInternal = null;               // 'emerald-gold', 'noir', ...
 
   const fallbackCategories = [
     {
@@ -65,7 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
       items: [
         {
           name: "Status API (contoh)",
-          desc: "Contoh endpoint jika settings.json gagal dimuat.",
+          desc: "Contoh endpoint kalau settings.json belum terbaca.",
           method: "GET",
           path: "https://httpbin.org/status/200",
           status: "online"
@@ -75,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ];
 
   // ================================
-  // UTILS
+  // UTIL
   // ================================
   function loadJSON(key, fallback) {
     try {
@@ -90,7 +90,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function saveJSON(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-    } catch {}
+    } catch {
+      // ignore
+    }
   }
 
   function appendLog(line) {
@@ -102,27 +104,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function beautifyJSON(text) {
     try {
-      const obj = typeof text === "string" ? JSON.parse(text) : text;
+      const obj = JSON.parse(text);
       return JSON.stringify(obj, null, 2);
     } catch {
-      return typeof text === "string" ? text : String(text);
+      return text;
     }
   }
 
-  // Force unlock scroll (prevent ngestuck modal)
+  // ✅ FIX KERAS: pastikan scroll nggak ngestuck
   function forceUnlockScroll() {
     DOM.body.classList.remove("modal-open");
     DOM.body.style.overflow = "";
     DOM.body.style.paddingRight = "";
-    document.querySelectorAll(".modal-backdrop").forEach((b) => {
-      if (b && b.parentNode) b.parentNode.removeChild(b);
-    });
+
+    document
+      .querySelectorAll(".modal-backdrop")
+      .forEach((b) => b.parentNode && b.parentNode.removeChild(b));
   }
 
+  // hard close modal (baik lewat bootstrap maupun manual)
   function hardCloseModal() {
-    try {
-      if (modalInstance) modalInstance.hide();
-    } catch {}
+    if (modalInstance) {
+      try {
+        modalInstance.hide();
+      } catch (e) {
+        // ignore
+      }
+    }
     if (DOM.modalEl) {
       DOM.modalEl.classList.remove("show");
       DOM.modalEl.style.display = "none";
@@ -131,8 +139,11 @@ document.addEventListener("DOMContentLoaded", () => {
     forceUnlockScroll();
   }
 
+  // panggil di awal untuk jaga-jaga
+  forceUnlockScroll();
+
   // ================================
-  // MEDIA DETECTION & PREVIEW
+  // DETEKSI MEDIA (foto / video / audio)
   // ================================
   function getMediaTypeFromUrl(url) {
     const clean = (url || "").split("?")[0].toLowerCase();
@@ -144,9 +155,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showMediaPreview(url) {
     if (!DOM.apiResponseContent) return;
+
     const type = getMediaTypeFromUrl(url);
     if (!type) return;
+
     DOM.apiResponseContent.innerHTML = "";
+
     let el;
     if (type === "image") {
       el = document.createElement("img");
@@ -166,18 +180,26 @@ document.addEventListener("DOMContentLoaded", () => {
       el.controls = true;
       el.style.width = "100%";
     }
+
     if (el) {
       DOM.apiResponseContent.appendChild(el);
-      if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = "Preview media (langsung dari endpoint).";
+      if (DOM.modalStatusLine) {
+        DOM.modalStatusLine.textContent = "Preview media (langsung dari endpoint).";
+      }
     }
   }
 
   // ================================
-  // THEME MODE + PRESET
+  // THEME MODE (LIGHT / DARK)
   // ================================
   function detectSystemMode() {
     try {
-      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+      if (
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+      ) {
+        return "dark";
+      }
       return "light";
     } catch {
       return "light";
@@ -200,22 +222,55 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function initMode() {
     const stored = loadJSON("ada-ui-mode", null);
-    if (stored === "dark" || stored === "light") applyMode(stored);
-    else applyMode(detectSystemMode());
-    if (DOM.themeToggle) DOM.themeToggle.addEventListener("change", () => {
-      applyMode(DOM.themeToggle.checked ? "dark" : "light");
-    });
+    if (stored === "dark" || stored === "light") {
+      applyMode(stored);
+    } else {
+      applyMode(detectSystemMode());
+      if (window.matchMedia) {
+        const mq = window.matchMedia("(prefers-color-scheme: dark)");
+        const handler = (e) => applyMode(e.matches ? "dark" : "light");
+        if (mq.addEventListener) mq.addEventListener("change", handler);
+        else mq.addListener(handler);
+      }
+    }
+
+    if (DOM.themeToggle) {
+      DOM.themeToggle.addEventListener("change", () => {
+        applyMode(DOM.themeToggle.checked ? "dark" : "light");
+      });
+    }
   }
 
-  const presetMap = { emerald: "emerald-gold", noir: "noir", ivory: "royal-amber", cyber: "cyber-glow", olive: "emerald-gold" };
-  const reversePresetMap = { "emerald-gold": "emerald", noir: "noir", "royal-amber": "ivory", "cyber-glow": "cyber" };
+  // ================================
+  // THEME PRESET (Emerald, Noir, dll)
+  // ================================
+  const presetMap = {
+    emerald: "emerald-gold",
+    noir: "noir",
+    ivory: "royal-amber",
+    cyber: "cyber-glow",
+    olive: "emerald-gold"
+  };
+
+  const reversePresetMap = {
+    "emerald-gold": "emerald",
+    noir: "noir",
+    "royal-amber": "ivory",
+    "cyber-glow": "cyber"
+  };
 
   function applyPreset(internalKey) {
     const allowed = ["emerald-gold", "noir", "royal-amber", "cyber-glow"];
     if (!allowed.includes(internalKey)) internalKey = "emerald-gold";
+
     themePresetInternal = internalKey;
     saveJSON("ada-ui-theme", internalKey);
-    if (DOM.themePreset) DOM.themePreset.value = reversePresetMap[internalKey] || "emerald";
+
+    if (DOM.themePreset) {
+      const selectValue = reversePresetMap[internalKey] || "emerald";
+      DOM.themePreset.value = selectValue;
+    }
+
     syncBodyThemeAttr();
   }
 
@@ -223,9 +278,11 @@ document.addEventListener("DOMContentLoaded", () => {
     let stored = loadJSON("ada-ui-theme", null);
     if (!stored) stored = "emerald-gold";
     applyPreset(stored);
+
     if (DOM.themePreset) {
       DOM.themePreset.addEventListener("change", () => {
-        const internalKey = presetMap[DOM.themePreset.value] || "emerald-gold";
+        const userValue = DOM.themePreset.value;
+        const internalKey = presetMap[userValue] || "emerald-gold";
         applyPreset(internalKey);
       });
     }
@@ -234,24 +291,60 @@ document.addEventListener("DOMContentLoaded", () => {
   // ================================
   // SIDEBAR
   // ================================
-  function openSidebarMobile() { if (!DOM.sideNav) return; DOM.sideNav.classList.add("open"); DOM.body.classList.add("sidebar-open"); if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.classList.add("show"); }
-  function closeSidebarMobile() { if (!DOM.sideNav) return; DOM.sideNav.classList.remove("open"); DOM.body.classList.remove("sidebar-open"); if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.classList.remove("show"); }
-  function toggleSidebarCollapsedDesktop() { if (!DOM.sideNav) return; DOM.sideNav.classList.toggle("collapsed"); }
+  function openSidebarMobile() {
+    if (!DOM.sideNav) return;
+    DOM.sideNav.classList.add("open");
+    DOM.body.classList.add("sidebar-open");
+    if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.classList.add("show");
+  }
+
+  function closeSidebarMobile() {
+    if (!DOM.sideNav) return;
+    DOM.sideNav.classList.remove("open");
+    DOM.body.classList.remove("sidebar-open");
+    if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.classList.remove("show");
+  }
+
+  function toggleSidebarCollapsedDesktop() {
+    if (!DOM.sideNav) return;
+    DOM.sideNav.classList.toggle("collapsed");
+  }
 
   function initSidebar() {
-    if (DOM.menuToggle) DOM.menuToggle.addEventListener("click", () => {
-      if (window.innerWidth < 992) {
-        if (DOM.sideNav.classList.contains("open")) closeSidebarMobile(); else openSidebarMobile();
-      } else toggleSidebarCollapsedDesktop();
-    });
-    if (DOM.navCollapseBtn) DOM.navCollapseBtn.addEventListener("click", toggleSidebarCollapsedDesktop);
-    if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.addEventListener("click", closeSidebarMobile);
+    if (DOM.menuToggle) {
+      DOM.menuToggle.addEventListener("click", () => {
+        if (window.innerWidth < 992) {
+          if (DOM.sideNav.classList.contains("open")) {
+            closeSidebarMobile();
+          } else {
+            openSidebarMobile();
+          }
+        } else {
+          toggleSidebarCollapsedDesktop();
+        }
+      });
+    }
 
+    if (DOM.navCollapseBtn) {
+      DOM.navCollapseBtn.addEventListener("click", () => {
+        toggleSidebarCollapsedDesktop();
+      });
+    }
+
+    if (DOM.sidebarBackdrop) {
+      DOM.sidebarBackdrop.addEventListener("click", () => {
+        closeSidebarMobile();
+      });
+    }
+
+    // klik link di sidebar
     DOM.sideNavLinks.forEach((link) => {
       link.addEventListener("click", () => {
         const href = link.getAttribute("href") || "";
-        if (window.innerWidth < 992) closeSidebarMobile();
-        else if (href === "#hero" || href === "#home") {
+        if (window.innerWidth < 992) {
+          closeSidebarMobile();
+        } else if (href === "#hero" || href === "#home") {
+          // klik Beranda di desktop → sidebar dibuka, modal ditutup, scroll di-unlock
           if (DOM.sideNav) DOM.sideNav.classList.remove("collapsed");
           hardCloseModal();
         }
@@ -265,9 +358,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
+    // highlight menu aktif saat scroll
     window.addEventListener("scroll", () => {
       const headerOffset = 72;
       const scrollY = window.scrollY + headerOffset;
+
       document.querySelectorAll("main section[id]").forEach((section) => {
         const top = section.offsetTop;
         const bottom = top + section.offsetHeight;
@@ -289,46 +384,85 @@ document.addEventListener("DOMContentLoaded", () => {
     const catMatch = itemEl.dataset.catMatch !== "0";
     const favMatch = itemEl.dataset.favMatch !== "0";
     const searchMatch = itemEl.dataset.searchMatch !== "0";
-    itemEl.style.display = catMatch && favMatch && searchMatch ? "" : "none";
+    const visible = catMatch && favMatch && searchMatch;
+    itemEl.style.display = visible ? "" : "none";
   }
 
   function filterApis(query) {
-    query = (query || "").trim().toLowerCase();
-    const itemEls = DOM.apiContent ? DOM.apiContent.querySelectorAll(".api-item") : [];
+    query = query.trim().toLowerCase();
+    const itemEls = DOM.apiContent
+      ? DOM.apiContent.querySelectorAll(".api-item")
+      : [];
+
     itemEls.forEach((el) => {
-      const name = el.querySelector(".api-card-title")?.textContent.toLowerCase() || "";
-      const desc = el.querySelector(".api-card-desc")?.textContent.toLowerCase() || "";
-      const path = el.querySelector(".api-path")?.textContent.toLowerCase() || "";
-      const match = !query || name.includes(query) || desc.includes(query) || path.includes(query);
+      const name =
+        el.querySelector(".api-card-title")?.textContent.toLowerCase() || "";
+      const desc =
+        el.querySelector(".api-card-desc")?.textContent.toLowerCase() || "";
+      const path =
+        el.querySelector(".api-path")?.textContent.toLowerCase() || "";
+
+      const match =
+        !query ||
+        name.includes(query) ||
+        desc.includes(query) ||
+        path.includes(query);
+
       el.dataset.searchMatch = match ? "1" : "0";
       applyCombinedVisibility(el);
     });
   }
 
   function initSearch() {
-    if (DOM.searchInput) DOM.searchInput.addEventListener("input", () => filterApis(DOM.searchInput.value));
-    if (DOM.clearSearch) DOM.clearSearch.addEventListener("click", () => { if (DOM.searchInput) DOM.searchInput.value = ""; filterApis(""); });
+    if (DOM.searchInput) {
+      DOM.searchInput.addEventListener("input", () => {
+        filterApis(DOM.searchInput.value);
+      });
+    }
+    if (DOM.clearSearch) {
+      DOM.clearSearch.addEventListener("click", () => {
+        DOM.searchInput.value = "";
+        filterApis("");
+      });
+    }
   }
 
   // ================================
-  // FAVORITE & HISTORY
+  // FAVORIT & HISTORY
   // ================================
-  function isFav(path) { return favorites.includes(path); }
+  function isFav(path) {
+    return favorites.includes(path);
+  }
 
   function toggleFav(path, btn) {
     const idx = favorites.indexOf(path);
     const itemEl = btn.closest(".api-item");
-    if (idx >= 0) { favorites.splice(idx, 1); btn.classList.remove("favorited"); if (itemEl) itemEl.dataset.fav = "0"; }
-    else { favorites.push(path); btn.classList.add("favorited"); if (itemEl) itemEl.dataset.fav = "1"; }
+
+    if (idx >= 0) {
+      favorites.splice(idx, 1);
+      btn.classList.remove("favorited");
+      if (itemEl) itemEl.dataset.fav = "0";
+    } else {
+      favorites.push(path);
+      btn.classList.add("favorited");
+      if (itemEl) itemEl.dataset.fav = "1";
+    }
     saveJSON("ada-api-fav", favorites);
+
     if (DOM.apiFilters) {
       const active = DOM.apiFilters.querySelector(".filter-chip.active");
-      if (active && active.dataset.filter === "favorites") applyFilters("favorites");
+      if (active && active.dataset.filter === "favorites") {
+        applyFilters("favorites");
+      }
     }
   }
 
   function addHistory(item) {
-    historyItems.unshift({ name: item.name, path: item.path, ts: new Date().toISOString() });
+    historyItems.unshift({
+      name: item.name,
+      path: item.path,
+      ts: new Date().toISOString()
+    });
     historyItems = historyItems.slice(0, 20);
     saveJSON("ada-api-history", historyItems);
     renderHistory();
@@ -338,172 +472,328 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!DOM.requestHistoryList) return;
     DOM.requestHistoryList.innerHTML = "";
     historyItems.forEach((item) => {
-      const li = document.createElement("li"); li.className = "history-item";
-      const nameSpan = document.createElement("span"); nameSpan.className = "history-name"; nameSpan.textContent = item.name;
-      const pathSpan = document.createElement("span"); pathSpan.className = "history-path"; pathSpan.textContent = item.path;
-      li.appendChild(nameSpan); li.appendChild(pathSpan); DOM.requestHistoryList.appendChild(li);
+      const li = document.createElement("li");
+      li.className = "history-item";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "history-name";
+      nameSpan.textContent = item.name;
+
+      const pathSpan = document.createElement("span");
+      pathSpan.className = "history-path";
+      pathSpan.textContent = item.path;
+
+      li.appendChild(nameSpan);
+      li.appendChild(pathSpan);
+      DOM.requestHistoryList.appendChild(li);
     });
   }
 
   // ================================
-  // FILTERS
+  // FILTER VISIBILITY (category/favorites)
   // ================================
   function applyFilters(activeFilter) {
-    const items = DOM.apiContent ? DOM.apiContent.querySelectorAll(".api-item") : [];
+    const items = DOM.apiContent
+      ? DOM.apiContent.querySelectorAll(".api-item")
+      : [];
+
     items.forEach((itemEl) => {
       const catName = itemEl.dataset.category;
       const isFavItem = itemEl.dataset.fav === "1";
-      if (activeFilter === "all" || activeFilter === "favorites") itemEl.dataset.catMatch = "1";
-      else itemEl.dataset.catMatch = catName === activeFilter ? "1" : "0";
-      if (activeFilter === "favorites") itemEl.dataset.favMatch = isFavItem ? "1" : "0";
-      else itemEl.dataset.favMatch = "1";
+
+      if (activeFilter === "all" || activeFilter === "favorites") {
+        itemEl.dataset.catMatch = "1";
+      } else {
+        itemEl.dataset.catMatch = catName === activeFilter ? "1" : "0";
+      }
+
+      if (activeFilter === "favorites") {
+        itemEl.dataset.favMatch = isFavItem ? "1" : "0";
+      } else {
+        itemEl.dataset.favMatch = "1";
+      }
+
       if (!itemEl.dataset.searchMatch) itemEl.dataset.searchMatch = "1";
+
       applyCombinedVisibility(itemEl);
     });
   }
 
-  function renderFilters(categories) {
-    if (!DOM.apiFilters) return;
-    DOM.apiFilters.innerHTML = "";
-    const makeChip = (label, value, active = false) => {
-      const btn = document.createElement("button"); btn.type = "button"; btn.className = "filter-chip"; btn.dataset.filter = value; btn.textContent = label;
-      if (active) btn.classList.add("active"); DOM.apiFilters.appendChild(btn); return btn;
-    };
-    makeChip("Semua", "all", true);
-    categories.forEach((cat) => makeChip(cat.name, cat.name));
-    makeChip("Search Tools", "search-tools"); makeChip("Favorites", "favorites");
-    DOM.apiFilters.onclick = (e) => {
-      const btn = e.target.closest(".filter-chip"); if (!btn) return;
-      DOM.apiFilters.querySelectorAll(".filter-chip").forEach((b) => b.classList.remove("active")); btn.classList.add("active");
-      const filter = btn.dataset.filter;
-      if (filter === "search-tools") applyFilters("all"); else applyFilters(filter);
-    };
-  }
-
   // ================================
-  // BUILD API CARD (GET + DOWNLOAD + FAV)
+  // BUILD API CARD (Get API + Download)
   // ================================
   function buildApiCard(categoryName, item) {
-    const col = document.createElement("div"); col.className = "col-12 col-md-6 col-lg-4 api-item"; col.dataset.category = categoryName;
-    const fav = isFav(item.path); col.dataset.fav = fav ? "1" : "0"; col.dataset.catMatch = "1"; col.dataset.favMatch = "1"; col.dataset.searchMatch = "1";
+    const col = document.createElement("div");
+    col.className = "col-12 col-md-6 col-lg-4 api-item";
+    col.dataset.category = categoryName;
 
-    const card = document.createElement("article"); card.className = "api-card";
-    const header = document.createElement("div"); header.className = "api-card-header";
-    const title = document.createElement("h4"); title.className = "api-card-title"; title.textContent = item.name;
-    const metaRow = document.createElement("div"); metaRow.className = "card-meta-row";
-    const methodBadge = document.createElement("span"); methodBadge.className = "http-badge";
-    const method = (item.method || "GET").toUpperCase(); methodBadge.textContent = method;
-    if (method === "POST") methodBadge.classList.add("http-post"); else if (method === "PUT") methodBadge.classList.add("http-put");
-    else if (method === "DELETE") methodBadge.classList.add("http-delete"); else methodBadge.classList.add("http-get");
+    const fav = isFav(item.path);
+    col.dataset.fav = fav ? "1" : "0";
+    col.dataset.catMatch = "1";
+    col.dataset.favMatch = "1";
+    col.dataset.searchMatch = "1";
 
-    const statusBadge = document.createElement("span"); statusBadge.className = "endpoint-status-pill"; statusBadge.dataset.path = item.path || ""; setStatusPill(statusBadge, item.status || "unknown");
-    metaRow.appendChild(methodBadge); metaRow.appendChild(statusBadge);
-    header.appendChild(title); header.appendChild(metaRow);
+    const card = document.createElement("article");
+    card.className = "api-card";
 
-    const desc = document.createElement("p"); desc.className = "api-card-desc"; desc.textContent = item.desc || "";
+    const header = document.createElement("div");
+    header.className = "api-card-header";
 
-    const footer = document.createElement("div"); footer.className = "api-card-footer";
-    const pathEl = document.createElement("div"); pathEl.className = "api-path"; pathEl.textContent = item.path;
+    const title = document.createElement("h4");
+    title.className = "api-card-title";
+    title.textContent = item.name;
 
-    const actions = document.createElement("div"); actions.className = "api-card-actions";
+    const metaRow = document.createElement("div");
+    metaRow.className = "card-meta-row";
 
-    // GET API button
-    const getBtn = document.createElement("button"); getBtn.type = "button"; getBtn.className = "api-open-btn"; getBtn.innerHTML = '<i class="fas fa-bolt me-1"></i>Get API';
+    const methodBadge = document.createElement("span");
+    methodBadge.className = "http-badge";
+    const method = (item.method || "GET").toUpperCase();
+    methodBadge.textContent = method;
+    if (method === "POST") methodBadge.classList.add("http-post");
+    else if (method === "PUT") methodBadge.classList.add("http-put");
+    else if (method === "DELETE") methodBadge.classList.add("http-delete");
+    else methodBadge.classList.add("http-get");
 
-    // DOWNLOAD button (uses prompt if download template ends with '=' or contains {query})
-    const downloadBtn = document.createElement("button"); downloadBtn.type = "button"; downloadBtn.className = "api-download-btn"; downloadBtn.innerHTML = '<i class="fas fa-download me-1"></i>Download';
+    const statusBadge = document.createElement("span");
+    statusBadge.className = "endpoint-status-pill";
+    statusBadge.dataset.path = item.path || "";
+    setStatusPill(statusBadge, item.status || "unknown");
+
+    metaRow.appendChild(methodBadge);
+    metaRow.appendChild(statusBadge);
+
+    header.appendChild(title);
+    header.appendChild(metaRow);
+
+    const desc = document.createElement("p");
+    desc.className = "api-card-desc";
+    desc.textContent = item.desc || "";
+
+    const footer = document.createElement("div");
+    footer.className = "api-card-footer";
+
+    const pathEl = document.createElement("div");
+    pathEl.className = "api-path";
+    pathEl.textContent = item.path;
+
+    const actions = document.createElement("div");
+    actions.className = "api-card-actions";
+
+    // ==== GET API (cek endpoint, buka modal) ====
+    const getBtn = document.createElement("button");
+    getBtn.type = "button";
+    getBtn.className = "api-open-btn";
+    getBtn.innerHTML = '<i class="fas fa-bolt me-1"></i>Get API';
+
+    // ==== DOWNLOAD (link manual dari settings.json) ====
+    const downloadBtn = document.createElement("button");
+    downloadBtn.type = "button";
+    downloadBtn.className = "api-download-btn";
+    downloadBtn.innerHTML = '<i class="fas fa-download me-1"></i>Download';
+
     const downloadBase = item.download || item.downloadUrl || "";
-    if (!downloadBase) downloadBtn.style.display = "none";
-    else {
-      downloadBtn.addEventListener("click", async () => {
+    if (!downloadBase) {
+      downloadBtn.style.display = "none";
+    } else {
+      downloadBtn.addEventListener("click", () => {
+        // kalau di settings.json kamu isi:
+        // "download": "/yt/mp3?url="
+        // maka di sini kita minta user isi URL YouTube dulu.
         let finalUrl = downloadBase;
-        const needsQuery = finalUrl.endsWith("=") || finalUrl.includes("{query}");
+        let needsQuery =
+          finalUrl.endsWith("=") || finalUrl.includes("{query}");
+
         if (needsQuery) {
           const userInput = prompt("Masukkan link / URL untuk di-download:");
           if (!userInput) return;
           const trimmed = userInput.trim();
           if (!trimmed) return;
-          if (finalUrl.includes("{query}")) finalUrl = finalUrl.replace("{query}", encodeURIComponent(trimmed));
-          else finalUrl = finalUrl + encodeURIComponent(trimmed);
-        }
 
-        appendLog(`Trying download ${finalUrl}`);
-
-        // Try HEAD first; fallback to GET. If CORS blocks HEAD, we'll catch and still open (some servers block HEAD).
-        try {
-          const head = await fetch(finalUrl, { method: "HEAD" });
-          if (!head.ok) {
-            const tryGet = await fetch(finalUrl, { method: "GET" });
-            if (!tryGet.ok) {
-              alert(`Gagal akses: server mengembalikan ${tryGet.status}.`);
-              return;
-            }
+          if (finalUrl.includes("{query}")) {
+            finalUrl = finalUrl.replace("{query}", encodeURIComponent(trimmed));
+          } else {
+            finalUrl = finalUrl + encodeURIComponent(trimmed);
           }
-        } catch (err) {
-          console.warn("HEAD/GET check failed (possible CORS); opening anyway.", err);
         }
 
-        // Open in new tab to trigger download/preview
+        appendLog(`Download: ${finalUrl}`);
         window.open(finalUrl, "_blank");
       });
     }
 
-    // Favorite toggle
-    const favBtn = document.createElement("button"); favBtn.type = "button"; favBtn.className = "fav-toggle-btn"; favBtn.dataset.path = item.path; favBtn.innerHTML = '<i class="fas fa-star"></i>';
+    // ==== FAVORITE ====
+    const favBtn = document.createElement("button");
+    favBtn.type = "button";
+    favBtn.className = "fav-toggle-btn";
+    favBtn.dataset.path = item.path;
+    favBtn.innerHTML = '<i class="fas fa-star"></i>';
     if (fav) favBtn.classList.add("favorited");
 
     // events
     getBtn.addEventListener("click", () => openApiModal(item));
     favBtn.addEventListener("click", () => toggleFav(item.path, favBtn));
 
-    actions.appendChild(getBtn); actions.appendChild(downloadBtn); actions.appendChild(favBtn);
-    footer.appendChild(pathEl); footer.appendChild(actions);
-    card.appendChild(header); card.appendChild(desc); card.appendChild(footer); col.appendChild(card);
+    actions.appendChild(getBtn);
+    actions.appendChild(downloadBtn);
+    actions.appendChild(favBtn);
+
+    footer.appendChild(pathEl);
+    footer.appendChild(actions);
+
+    card.appendChild(header);
+    card.appendChild(desc);
+    card.appendChild(footer);
+    col.appendChild(card);
+
     return col;
   }
 
   // ================================
-  // STATUS CHECK
+  // FILTER CHIPS
+  // ================================
+  function renderFilters(categories) {
+    if (!DOM.apiFilters) return;
+    DOM.apiFilters.innerHTML = "";
+
+    const makeChip = (label, value, active = false) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "filter-chip";
+      btn.dataset.filter = value;
+      btn.textContent = label;
+      if (active) btn.classList.add("active");
+      DOM.apiFilters.appendChild(btn);
+      return btn;
+    };
+
+    makeChip("Semua", "all", true);
+
+    categories.forEach((cat) => {
+      makeChip(cat.name, cat.name);
+    });
+
+    makeChip("Search Tools", "search-tools");
+    makeChip("Favorites", "favorites");
+
+    DOM.apiFilters.onclick = (e) => {
+      const btn = e.target.closest(".filter-chip");
+      if (!btn) return;
+      DOM.apiFilters
+        .querySelectorAll(".filter-chip")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      const filter = btn.dataset.filter;
+      if (filter === "search-tools") {
+        applyFilters("all");
+      } else {
+        applyFilters(filter);
+      }
+    };
+  }
+
+  // ================================
+  // RENDER API CATEGORIES
+  // ================================
+  function renderApiCategories() {
+    if (!DOM.apiContent) return;
+    DOM.apiContent.innerHTML = "";
+
+    const categories =
+      settings &&
+      Array.isArray(settings.categories) &&
+      settings.categories.length
+        ? settings.categories
+        : fallbackCategories;
+
+    renderFilters(categories);
+
+    const row = document.createElement("div");
+    row.className = "row";
+
+    categories.forEach((cat) => {
+      const catName = cat.name || "Tanpa Kategori";
+      const items = Array.isArray(cat.items) ? cat.items : [];
+      items.forEach((item) => {
+        const col = buildApiCard(catName, item);
+        row.appendChild(col);
+      });
+    });
+
+    DOM.apiContent.appendChild(row);
+    applyFilters("all");
+    checkEndpointStatusForAll();
+  }
+
+  // ================================
+  // STATUS PILL + PING ENDPOINT
   // ================================
   function setStatusPill(el, status) {
     el.classList.remove("status-ok", "status-error", "status-unknown");
     const s = (status || "").toLowerCase();
-    if (s === "ok" || s === "online" || s === "ready") { el.classList.add("status-ok"); el.textContent = "Online"; }
-    else if (s === "error" || s === "down" || s === "failed") { el.classList.add("status-error"); el.textContent = "Error"; }
-    else if (s === "checking") { el.classList.add("status-unknown"); el.textContent = "Checking…"; }
-    else { el.classList.add("status-unknown"); el.textContent = "Unknown"; }
+
+    if (s === "ok" || s === "online" || s === "ready") {
+      el.classList.add("status-ok");
+      el.textContent = "Online";
+    } else if (s === "error" || s === "down" || s === "failed") {
+      el.classList.add("status-error");
+      el.textContent = "Error";
+    } else if (s === "checking") {
+      el.classList.add("status-unknown");
+      el.textContent = "Checking…";
+    } else {
+      el.classList.add("status-unknown");
+      el.textContent = "Unknown";
+    }
   }
 
   function checkEndpointStatusForAll() {
-    const items = DOM.apiContent ? DOM.apiContent.querySelectorAll(".api-item") : [];
+    const items = DOM.apiContent
+      ? DOM.apiContent.querySelectorAll(".api-item")
+      : [];
     if (!items.length) return;
+
     items.forEach((itemEl) => {
       const pathEl = itemEl.querySelector(".api-path");
       const statusEl = itemEl.querySelector(".endpoint-status-pill");
       const methodBadge = itemEl.querySelector(".http-badge");
       if (!pathEl || !statusEl) return;
+
       const url = (pathEl.textContent || "").trim();
       if (!url) return;
-      const method = (methodBadge?.textContent || "GET").toString().trim().toUpperCase();
+      const method = (methodBadge?.textContent || "GET")
+        .toString()
+        .trim()
+        .toUpperCase();
+
+      const fetchMethod = method === "GET" ? "GET" : "GET";
+
       setStatusPill(statusEl, "checking");
-      // do a quick GET — some servers block HEAD
-      fetch(url, { method: "GET" })
-        .then((res) => { if (res.ok) setStatusPill(statusEl, "online"); else setStatusPill(statusEl, "error"); })
+      fetch(url, { method: fetchMethod })
+        .then((res) => {
+          if (res.ok) setStatusPill(statusEl, "online");
+          else setStatusPill(statusEl, "error");
+        })
         .catch(() => setStatusPill(statusEl, "error"));
     });
   }
 
   // ================================
-  // MODAL / API REQUEST
+  // MODAL TRY API (+ MEDIA FIX)
   // ================================
   function openApiModal(item) {
     currentApiItem = item;
     if (!DOM.modalEl) return;
+
+    // sebelum buka modal, pastikan state modal bersih
     forceUnlockScroll();
 
     const url = item.path || "";
+
     if (DOM.modalTitle) DOM.modalTitle.textContent = item.name || "Endpoint";
-    if (DOM.modalSubtitle) DOM.modalSubtitle.textContent = item.desc || url || "";
+    if (DOM.modalSubtitle)
+      DOM.modalSubtitle.textContent = item.desc || url || "";
     if (DOM.endpointText) DOM.endpointText.textContent = url;
     if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = "";
     if (DOM.apiResponseContent) DOM.apiResponseContent.textContent = "";
@@ -512,8 +802,10 @@ document.addEventListener("DOMContentLoaded", () => {
     addHistory({ name: item.name || "Endpoint", path: url });
     appendLog(`Open modal for ${item.name} -> ${url}`);
 
-    if (modalInstance) modalInstance.show();
-    else {
+    // buka modal (bootstrap kalau ada, kalau nggak manual)
+    if (modalInstance) {
+      modalInstance.show();
+    } else {
       DOM.modalEl.style.display = "block";
       DOM.modalEl.classList.add("show");
       DOM.modalEl.removeAttribute("aria-hidden");
@@ -521,13 +813,17 @@ document.addEventListener("DOMContentLoaded", () => {
       DOM.body.style.overflow = "hidden";
     }
 
+    // cek apakah endpoint adalah media
     const mediaType = getMediaTypeFromUrl(url);
     if (mediaType) {
-      if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = "Memuat media langsung dari endpoint…";
+      if (DOM.modalStatusLine) {
+        DOM.modalStatusLine.textContent = "Memuat media langsung dari endpoint…";
+      }
       showMediaPreview(url);
       return;
     }
 
+    // non-media → request seperti biasa
     sendApiRequest();
   }
 
@@ -537,7 +833,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const url = currentApiItem.path || "";
     if (!url) return;
 
-    if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = "Mengirim permintaan…";
+    if (DOM.modalStatusLine) {
+      DOM.modalStatusLine.textContent = "Mengirim permintaan…";
+    }
     if (DOM.modalLoading) DOM.modalLoading.classList.remove("d-none");
     if (DOM.apiResponseContent) DOM.apiResponseContent.textContent = "";
 
@@ -545,70 +843,75 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const res = await fetch(url, { method });
-      if (!res.ok) {
-        const ct = res.headers.get("content-type") || "";
-        if (ct.includes("text/html")) {
-          DOM.apiResponseContent.textContent = `Error ${res.status}: endpoint mungkin tidak ditemukan (HTML response). Periksa settings.json / base URL backend.`;
-        } else {
-          const txt = await res.text();
-          DOM.apiResponseContent.textContent = txt || `Error ${res.status}`;
-        }
-        if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = `Status: ${res.status} (Error)`;
-        appendLog(`Response ${res.status} untuk ${url}`);
-        return;
-      }
+      const text = await res.text();
+      const pretty = beautifyJSON(text);
 
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        const json = await res.json();
-        DOM.apiResponseContent.textContent = JSON.stringify(json, null, 2);
-      } else if (contentType.includes("text/") || contentType.includes("application/xml")) {
-        const text = await res.text();
-        DOM.apiResponseContent.textContent = text;
-      } else {
-        DOM.apiResponseContent.textContent = `Response OK — content-type: ${contentType}. Gunakan tombol Download untuk menyimpan file jika diperlukan.`;
+      if (DOM.apiResponseContent) {
+        DOM.apiResponseContent.textContent = pretty;
       }
-
-      if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = `Status: ${res.status} (OK)`;
+      if (DOM.modalStatusLine) {
+        DOM.modalStatusLine.textContent = `Status: ${res.status} ${
+          res.ok ? "(OK)" : "(Error)"
+        }`;
+      }
       appendLog(`Response ${res.status} untuk ${url}`);
     } catch (err) {
-      if (DOM.apiResponseContent) DOM.apiResponseContent.textContent = String(err);
-      if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = "Gagal melakukan request.";
-      appendLog(`Error: ${err.message || err}`);
+      if (DOM.apiResponseContent) {
+        DOM.apiResponseContent.textContent = String(err);
+      }
+      if (DOM.modalStatusLine) {
+        DOM.modalStatusLine.textContent = "Gagal melakukan request.";
+      }
+      appendLog(`Error: ${err.message}`);
     } finally {
       if (DOM.modalLoading) DOM.modalLoading.classList.add("d-none");
     }
   }
 
   function initModalEvents() {
+    // kalau Bootstrap benar-benar dipakai, dengarkan hidden.bs.modal
     if (DOM.modalEl && window.bootstrap && bootstrap.Modal) {
-      DOM.modalEl.addEventListener("hidden.bs.modal", () => { forceUnlockScroll(); });
+      DOM.modalEl.addEventListener("hidden.bs.modal", () => {
+        forceUnlockScroll();
+      });
     }
 
+    // JAGA-JAGA: kalau ada tombol dengan data-bs-dismiss="modal" / .btn-close
     document.addEventListener("click", (e) => {
-      const closeBtn = e.target.closest("[data-bs-dismiss='modal'], .btn-close, .modal-close");
+      const closeBtn = e.target.closest(
+        "[data-bs-dismiss='modal'], .btn-close, .modal-close"
+      );
       if (!closeBtn) return;
-      setTimeout(() => { hardCloseModal(); }, 120);
+
+      // kasih delay dikit buat Bootstrap beresin, baru kita paksa unlock
+      setTimeout(() => {
+        hardCloseModal();
+      }, 150);
     });
 
     if (DOM.copyEndpointBtn && DOM.endpointText) {
       DOM.copyEndpointBtn.addEventListener("click", async () => {
-        try { await navigator.clipboard.writeText(DOM.endpointText.textContent); appendLog("Endpoint copied"); } catch {}
+        try {
+          await navigator.clipboard.writeText(DOM.endpointText.textContent);
+        } catch {}
       });
     }
+
     if (DOM.copyCurlBtn) {
       DOM.copyCurlBtn.addEventListener("click", async () => {
         if (!currentApiItem) return;
         const method = (currentApiItem.method || "GET").toUpperCase();
         const url = currentApiItem.path || "";
         const curl = `curl -X ${method} "${url}"`;
-        try { await navigator.clipboard.writeText(curl); appendLog("cURL copied"); } catch {}
+        try {
+          await navigator.clipboard.writeText(curl);
+        } catch {}
       });
     }
   }
 
   // ================================
-  // REQUEST BOX (example send to WA)
+  // REQUEST BOX → WHATSAPP
   // ================================
   function initRequestBox() {
     if (!DOM.apiRequestInput || !DOM.sendApiRequest) return;
@@ -616,7 +919,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const text = DOM.apiRequestInput.value.trim();
       if (!text) return;
       const waNumber = "6287751121269";
-      const url = "https://wa.me/" + waNumber + "?text=" + encodeURIComponent("[Request Endpoint Ada API]\n\n" + text);
+      const url =
+        "https://wa.me/" +
+        waNumber +
+        "?text=" +
+        encodeURIComponent("[Request Endpoint Ada API]\n\n" + text);
       window.open(url, "_blank");
       appendLog("Request endpoint dikirim ke WhatsApp.");
       DOM.apiRequestInput.value = "";
@@ -624,9 +931,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ================================
-  // FX: cursor + banner parallax + reveal
+  // FX: CURSOR & BANNER
   // ================================
-  function initCursorGlow() { if (!DOM.cursorGlow) return; window.addEventListener("pointermove", (e) => { DOM.cursorGlow.style.transform = `translate(${e.clientX - 180}px, ${e.clientY - 180}px)`; }); }
+  function initCursorGlow() {
+    if (!DOM.cursorGlow) return;
+    window.addEventListener("pointermove", (e) => {
+      DOM.cursorGlow.style.transform = `translate(${e.clientX - 180}px, ${
+        e.clientY - 180
+      }px)`;
+    });
+  }
+
   function initBannerParallax() {
     if (!DOM.bannerParallax) return;
     DOM.bannerParallax.addEventListener("mousemove", (e) => {
@@ -646,18 +961,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function initScrollReveal() {
     const revealEls = document.querySelectorAll(".reveal");
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => { if (entry.isIntersecting) entry.target.classList.add("reveal-visible"); });
-    }, { threshold: 0.08 });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("reveal-visible");
+          }
+        });
+      },
+      { threshold: 0.08 }
+    );
     revealEls.forEach((el) => observer.observe(el));
   }
 
   // ================================
-  // SETTINGS (load + render)
+  // SETTINGS.JSON → HERO & API
   // ================================
   function applySettingsToHero() {
     if (!settings) return;
-    if (DOM.versionBadge && settings.version) DOM.versionBadge.textContent = settings.version;
+    if (DOM.versionBadge && settings.version) {
+      DOM.versionBadge.textContent = settings.version;
+    }
   }
 
   async function loadSettings() {
@@ -675,28 +999,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function renderApiCategories() {
-    if (!DOM.apiContent) return;
-    DOM.apiContent.innerHTML = "";
-    const categories = (settings && Array.isArray(settings.categories) && settings.categories.length) ? settings.categories : fallbackCategories;
-    renderFilters(categories);
-    const row = document.createElement("div"); row.className = "row";
-    categories.forEach((cat) => {
-      const catName = cat.name || "Tanpa Kategori";
-      const items = Array.isArray(cat.items) ? cat.items : [];
-      items.forEach((item) => { const col = buildApiCard(catName, item); row.appendChild(col); });
-    });
-    DOM.apiContent.appendChild(row);
-    applyFilters("all");
-    checkEndpointStatusForAll();
-  }
-
   // ================================
   // INIT
   // ================================
   async function init() {
     if (DOM.logsConsole) DOM.logsConsole.textContent = "";
-    initMode(); initPreset(); initSidebar(); initSearch(); initModalEvents(); initRequestBox(); initCursorGlow(); initBannerParallax(); initScrollReveal(); renderHistory();
+
+    initMode();
+    initPreset();
+    initSidebar();
+    initSearch();
+    initModalEvents();
+    initRequestBox();
+    initCursorGlow();
+    initBannerParallax();
+    initScrollReveal();
+    renderHistory();
+
     appendLog("Menyiapkan konsol Ada API…");
     await loadSettings();
     appendLog("Ada API Console siap.");
