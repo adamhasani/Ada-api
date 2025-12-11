@@ -11,17 +11,21 @@
           "name": "YouTube MP3",
           "desc": "Convert YouTube video to MP3.",
           "method": "GET",
-          "path": "https://ada-api-vace.vercel.app/api/ytmp3?url=https://youtu.be/eP3UsuxK30U?si=_fqzOY-KTLctC6pr",
+          "path": "https://ada-api-vace.vercel.app/api/download/ytmp3?url=https://youtu.be/eP3UsuxK30U?si=_fqzOY-KTLctC6pr",
           "status": "ready",
-          "params": { "url": "Link YouTube" }
+          "params": {
+            "url": "Link YouTube"
+          }
         },
         {
           "name": "YouTube MP4",
           "desc": "Download YouTube video as MP4.",
           "method": "GET",
-          "path": "https://ada-api-vace.vercel.app/api/ytmp4?url=https://youtu.be/eP3UsuxK30U?si=_fqzOY-KTLctC6pr",
+          "path": "https://ada-api-vace.vercel.app/api/download/ytmp4?url=https://youtu.be/eP3UsuxK30U?si=_fqzOY-KTLctC6pr",
           "status": "ready",
-          "params": { "url": "Link YouTube" }
+          "params": {
+            "url": "Link YouTube"
+          }
         }
       ]
     },
@@ -34,7 +38,9 @@
           "method": "GET",
           "path": "https://ada-api-vace.vercel.app/api/search/yt?q=lagu galau",
           "status": "ready",
-          "params": { "q": "Judul Lagu" }
+          "params": {
+            "q": "Judul Lagu"
+          }
         }
       ]
     }
