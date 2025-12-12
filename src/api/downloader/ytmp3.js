@@ -6,90 +6,74 @@ module.exports = function(app) {
         if (!url) return res.status(400).json({ status: false, error: "Url wajib diisi" });
 
         const targetUrl = encodeURIComponent(url);
+        const TIMEOUT = 9000; // 9 Detik (Mepet batas Vercel)
         
-        // TIMEOUT KETAT: Cuma 3.5 Detik per API
-        // Total maks waktu tunggu = 3.5 x 3 = 10.5 detik (Pas batas Vercel)
-        const TIMEOUT_LIMIT = 3500; 
+        // Fungsi Template Request
+        const fetchAPI = (sourceName, apiUrl) => {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    console.log(`[Race] Start: ${sourceName}`);
+                    const { data } = await axios.get(apiUrl, { 
+                        timeout: TIMEOUT,
+                        headers: { 'User-Agent': 'Mozilla/5.0' } // Biar dikira browser
+                    });
 
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        };
+                    // Cek validitas data tiap API (beda-beda dikit strukturnya)
+                    let result = null;
 
-        // --- SUMBER 1: Vercel GW ---
-        const trySource1 = async () => {
-            try {
-                console.log("[YTMP3] Coba API 1...");
-                const { data } = await axios.get(`https://woy-kontol-web-api-gw-jangan-diseba.vercel.app/download/ytmp3?url=${targetUrl}`, { 
-                    timeout: TIMEOUT_LIMIT, headers 
-                });
-                
-                if (data && (data.download || data.url || data.data?.download)) {
-                    const res = data.data || data;
-                    return { source: "API 1", title: res.title, thumb: res.thumbnail, url: res.download || res.url };
+                    // Logika Filter Respon
+                    if (sourceName === "API 1" && (data.download || data.url)) {
+                        result = { title: data.data?.title || "Audio", url: data.download || data.url, thumb: data.data?.thumbnail };
+                    } 
+                    else if (sourceName === "API 2" && data.status && data.result?.url) {
+                        result = { title: data.result.title, url: data.result.url, thumb: data.result.thumb };
+                    }
+                    else if (sourceName === "API 3" && (data.url || data.download)) {
+                        result = { title: data.title, url: data.url || data.download, thumb: data.thumbnail };
+                    }
+
+                    if (result && result.url) {
+                        console.log(`[Race] WINNER: ${sourceName}`);
+                        resolve({ source: sourceName, ...result });
+                    } else {
+                        reject(new Error(`${sourceName} kosong`));
+                    }
+                } catch (e) {
+                    reject(new Error(`${sourceName} error: ${e.message}`));
                 }
-            } catch (e) { console.log(`[Skip] API 1: ${e.message}`); }
-            return null;
+            });
         };
 
-        // --- SUMBER 2: Zenzxz ---
-        const trySource2 = async () => {
-            try {
-                console.log("[YTMP3] Coba API 2...");
-                const { data } = await axios.get(`https://api.zenzxz.my.id/api/downloader/ytmp3?url=${targetUrl}&format=128k`, { 
-                    timeout: TIMEOUT_LIMIT, headers 
-                });
-                
-                if (data?.status && data?.result?.url) {
-                    return { source: "API 2", title: data.result.title, thumb: data.result.thumb, url: data.result.url };
-                }
-            } catch (e) { console.log(`[Skip] API 2: ${e.message}`); }
-            return null;
-        };
-
-        // --- SUMBER 3: Zelapi ---
-        const trySource3 = async () => {
-            try {
-                console.log("[YTMP3] Coba API 3...");
-                const { data } = await axios.get(`https://zelapioffciall.koyeb.app/download/youtube?url=${targetUrl}`, { 
-                    timeout: TIMEOUT_LIMIT, headers 
-                });
-                
-                if (data?.url || data?.download) {
-                    return { source: "API 3", title: data.title, thumb: data.thumbnail, url: data.url || data.download };
-                }
-            } catch (e) { console.log(`[Skip] API 3: ${e.message}`); }
-            return null;
-        };
-
-        // === EKSEKUSI CEPAT ===
+        // === MULAI BALAPAN ===
         try {
-            let result = await trySource1();
-            if (!result) result = await trySource2();
-            if (!result) result = await trySource3();
+            // Kita jalankan 3 request SEKALIGUS!
+            // Promise.any akan mengambil yang PERTAMA KALI sukses.
+            const winner = await Promise.any([
+                fetchAPI("API 1", `https://woy-kontol-web-api-gw-jangan-diseba.vercel.app/download/ytmp3?url=${targetUrl}`),
+                fetchAPI("API 2", `https://api.zenzxz.my.id/api/downloader/ytmp3?url=${targetUrl}&format=128k`),
+                fetchAPI("API 3", `https://zelapioffciall.koyeb.app/download/youtube?url=${targetUrl}`)
+            ]);
 
-            if (!result) {
-                return res.status(503).json({ 
-                    status: false, 
-                    creator: "Ada API",
-                    error: "Gagal mengambil data. Server sumber sibuk/mati. Coba lagi 1 menit lagi." 
-                });
-            }
-
+            // Kirim Pemenang ke User
             res.json({
                 status: true,
-                creator: `Ada API (via ${result.source})`,
+                creator: `Ada API (Fastest: ${winner.source})`,
                 result: {
                     type: "audio",
-                    title: result.title || "Unknown Title",
-                    thumb: result.thumb || "https://i.ibb.co/3dM3W6h/music-placeholder.png",
-                    url: result.url,
+                    title: winner.title || "YouTube Audio",
+                    thumb: winner.thumb || "https://i.ibb.co/3dM3W6h/music-placeholder.png",
+                    url: winner.url,
                     quality: "128kbps"
                 }
             });
 
-        } catch (e) {
-            console.error("[Fatal Error]", e.message);
-            res.status(500).json({ status: false, error: "Server Error" });
+        } catch (error) {
+            // Kalau ke-3 nya gagal semua
+            console.error("[Race Failed] Semua API Gagal/Timeout");
+            res.status(503).json({ 
+                status: false, 
+                error: "Server sibuk. Semua sumber API sedang down atau timeout." 
+            });
         }
     });
 };
