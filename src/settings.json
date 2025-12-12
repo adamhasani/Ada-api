@@ -1,31 +1,66 @@
 {
-  "name": "Ada API (vace)",
-  "version": "v1.2",
-  "description": "Simple and easy API for developers.",
-  "bannerImage": "/src/banner.jpg",
+  "name": "Ada API UI",
+  "version": "v1.0.0",
+  "description": "Simple and easy to use API console for Ada API.",
+  "bannerImage": "/src/banner.gif",
+  "header": {
+    "status": "Online!"
+  },
+  "apiSettings": {
+    "creator": "Ada",
+    "apikey": ["ada-api"]
+  },
   "categories": [
     {
-      "name": "Media Tools",
+      "name": "AI (Artificial Intelligence)",
       "items": [
         {
-          "name": "YouTube MP3",
-          "desc": "Convert YouTube video to MP3.",
-          "method": "GET",
-          "path": "https://ada-api-vace.vercel.app/src/api/downloader/ytmp3?url=https://youtu.be/eP3UsuxK30U?si=_fqzOY-KTLctC6pr",
+          "name": "LuminAI",
+          "desc": "Talk with LuminAI. Contoh: text=halo dari web",
+          "path": "/ai/luminai?text=halo%20dari%20web",
           "status": "ready",
+          "method": "GET",
           "params": {
-            "url": "Link YouTube"
+            "text": "Text for luminai to respond to"
           }
         },
         {
-          "name": "YouTube MP4",
-          "desc": "Download YouTube video as MP4.",
-          "method": "GET",
-          "path": "https://ada-api-vace.vercel.app/api/downloader/ytmp4?url=https://youtu.be/eP3UsuxK30U?si=_fqzOY-KTLctC6pr",
+          "name": "HydroMind",
+          "desc": "Chat AI via HydroMind. Contoh: text=halo; model=isi sesuai daftar di mind.hydrooo.web.id",
+          "path": "/ai/hydromind?text=halo%20dari%20web&model=gpt-4o",
           "status": "ready",
+          "method": "GET",
           "params": {
-            "url": "Link YouTube"
+            "text": "Teks atau perintah untuk chat AI",
+            "model": "See the list of supported AI models here: https://mind.hydrooo.web.id"
           }
+        }
+      ]
+    },
+    {
+      "name": "Downloader",
+      "items": [
+        {
+          "name": "YouTube MP3",
+          "desc": "Download Audio YouTube via Link.",
+          "path": "/api/download/ytmp3?url=https://youtu.be/na8A4-fapww?si=sFu7VY0yzsUyLeTg",
+          "status": "ready",
+          "method": "GET",
+          "params": {
+            "url": "Link YouTube (Contoh: https://youtu.be/...)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Random",
+      "items": [
+        {
+          "name": "Blue Archive",
+          "desc": "Blue Archive random images.",
+          "path": "/random/ba",
+          "status": "ready",
+          "method": "GET"
         }
       ]
     },
@@ -33,13 +68,13 @@
       "name": "Search Tools",
       "items": [
         {
-          "name": "YouTube Search",
-          "desc": "Search YouTube videos.",
-          "method": "GET",
-          "path": "https://ada-api-vace.vercel.app/api/search/yt?q=lagu galau",
+          "name": "YouTube",
+          "desc": "Video search. Contoh: q=lofi hip hop",
+          "path": "/search/youtube?q=lofi%20hip%20hop",
           "status": "ready",
+          "method": "GET",
           "params": {
-            "q": "Judul Lagu"
+            "q": "Search query"
           }
         }
       ]
