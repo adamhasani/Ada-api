@@ -1,9 +1,9 @@
 /**
  * ADA API CONSOLE - MAIN SCRIPT (ULTIMATE EXTENDED EDITION)
  * =========================================================
- * Version: 4.0.0 (Full Developer)
+ * Version: 5.0.0 (Stable Release)
  * Author: Ada API Team
- * * Features:
+ * * FEATURES:
  * - Dynamic Sidebar & Theme Engine
  * - Smart Search & Filtering
  * - LocalStorage Favorites & History
@@ -11,13 +11,14 @@
  * - Auto File Upload Detection
  * - Multi-MIME Type Rendering
  * - Robust Error Handling (Red Screen of Death)
+ * - Mobile Friendly & Responsive
  */
 
 document.addEventListener("DOMContentLoaded", () => {
     
     // ================================================================
     // 1. DOM ELEMENTS CACHE
-    // Mengambil semua elemen HTML yang dibutuhkan di awal agar performa cepat
+    // Mengambil semua elemen HTML yang dibutuhkan di awal
     // ================================================================
     const DOM = {
         // Layout Utama
@@ -70,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
         copyCurlBtn: document.getElementById("copyCurlBtn"),
     };
 
-    // Inisialisasi Bootstrap Modal Wrapper
+    // Inisialisasi Bootstrap Modal Wrapper (dengan fallback)
     const modalInstance = DOM.modalEl && window.bootstrap ? new bootstrap.Modal(DOM.modalEl, { keyboard: true, backdrop: 'static' }) : null;
 
     // ================================================================
@@ -147,7 +148,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // --- CUSTOM TOAST NOTIFICATION SYSTEM ---
-    // Membuat notifikasi melayang di pojok kanan bawah
     function showToast(message, type = "success") {
         let toastContainer = document.getElementById("toast-container");
         if (!toastContainer) {
@@ -184,6 +184,31 @@ document.addEventListener("DOMContentLoaded", () => {
             toast.style.opacity = "0";
             setTimeout(() => toast.remove(), 500);
         }, 3000);
+    }
+
+    // --- SCREEN DEBUGGER (PENTING BUAT HP) ---
+    // Menampilkan kotak merah besar jika terjadi error fatal
+    function showErrorOnScreen(title, message) {
+        if (DOM.apiContent) {
+            DOM.apiContent.innerHTML = `
+                <div style="background: #fff5f5; border: 2px solid #ff4444; padding: 25px; border-radius: 15px; color: #cc0000; text-align: center; margin: 20px; box-shadow: 0 10px 30px rgba(255,0,0,0.15);">
+                    <i class="fas fa-bug fa-4x mb-4 text-danger"></i>
+                    <h3 style="margin-top: 0; font-weight: 800; color: #d32f2f;">⚠️ ${title}</h3>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ffcccc; margin: 20px 0; text-align: left; font-family: monospace; color: #333; word-break: break-word;">
+                        <strong>Error Message:</strong><br>${message}
+                    </div>
+                    <p style="font-size: 0.9em; text-align: left; color: #555;">
+                        <b>Troubleshooting:</b><br>
+                        1. Pastikan file <code>src/settings.json</code> ada.<br>
+                        2. Pastikan file API (JS) sudah di-update ke path <code>downloader</code>.<br>
+                        3. Cek apakah <code>index.js</code> sudah mengarah ke folder <code>api-gate</code>.
+                    </p>
+                    <button onclick="location.reload()" class="btn btn-danger btn-lg mt-3 w-100 shadow-sm">
+                        <i class="fas fa-sync-alt me-2"></i> Refresh Halaman
+                    </button>
+                </div>
+            `;
+        }
     }
 
     // ================================================================
@@ -307,15 +332,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const index = userFavorites.indexOf(path);
         
         if (index === -1) {
-            // Tambah ke favorit
             userFavorites.push(path);
             buttonElement.classList.add("favorited");
-            // Update atribut data card
             const card = buttonElement.closest(".api-item");
             if (card) card.dataset.fav = "1";
             showToast("Ditambahkan ke Favorit");
         } else {
-            // Hapus dari favorit
             userFavorites.splice(index, 1);
             buttonElement.classList.remove("favorited");
             const card = buttonElement.closest(".api-item");
@@ -327,7 +349,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function addToHistory(item) {
-        // Tambah item baru ke awal array
         userHistory.unshift({
             name: item.name,
             path: item.path,
@@ -367,15 +388,53 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ================================================================
-    // 7. RENDER API CONTENT & CARDS
+    // 7. LOAD SETTINGS (CRITICAL PART)
+    // Mengambil data API dari src/settings.json
+    // ================================================================
+
+    async function loadSettings() {
+        try {
+            appendLog("Menghubungi settings.json...");
+            
+            // Tambahkan timestamp agar browser tidak cache file settings
+            // Kita arahkan ke /src/settings.json (karena index.js sudah mount /src)
+            const res = await fetch("/src/settings.json?t=" + new Date().getTime());
+            
+            // --- DETEKSI ERROR ---
+            if (res.status === 404) throw new Error("File settings.json Tidak Ditemukan (404). Cek path di index.js!");
+            if (res.status === 500) throw new Error("Server Error (500). Cek log server.");
+            if (!res.ok) throw new Error(`HTTP Error ${res.status}: ${res.statusText}`);
+            
+            try {
+                appSettings = await res.json();
+            } catch (jsonError) {
+                throw new Error("Format JSON Salah. Cek file settings.json (Koma/Kurung berlebih).");
+            }
+            
+            appendLog("Settings loaded successfully.");
+            
+            if(DOM.versionBadge && appSettings.version) {
+                DOM.versionBadge.textContent = appSettings.version;
+            }
+            renderApiContent();
+            
+        } catch (err) {
+            // TAMPILKAN LAYAR MERAH
+            console.error(err);
+            appendLog(`FATAL ERROR: ${err.message}`, "error");
+            showErrorOnScreen("Gagal Memuat Data API", err.message);
+        }
+    }
+
+    // ================================================================
+    // 8. RENDER API CONTENT & CARDS
     // Fungsi utama untuk menampilkan daftar API ke layar
     // ================================================================
 
     function renderApiContent() {
-        if (!DOM.apiContent) return;
+        if (!DOM.apiContent || !appSettings) return;
         
-        // Gunakan settings yang sudah di-load atau fallback
-        const categories = (appSettings && appSettings.categories) ? appSettings.categories : fallbackCategories;
+        const categories = (appSettings.categories) ? appSettings.categories : fallbackCategories;
         
         // 1. Render Filter Buttons
         renderCategoryFilters(categories);
@@ -392,11 +451,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const col = document.createElement("div");
                 col.className = "col-12 col-md-6 col-lg-4 api-item";
                 
-                // Metadata untuk filtering
                 col.dataset.category = category.name;
                 col.dataset.fav = userFavorites.includes(item.path) ? "1" : "0";
                 
-                // Template HTML Kartu
                 col.innerHTML = `
                     <article class="api-card h-100">
                         <div class="api-card-header d-flex justify-content-between align-items-start mb-2">
@@ -469,13 +526,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // Logic Filter
         DOM.apiFilters.onclick = (e) => {
             if (!e.target.classList.contains("filter-chip")) return;
-            
-            // Toggle Active
             DOM.apiFilters.querySelectorAll(".filter-chip").forEach(b => b.classList.remove("active"));
             e.target.classList.add("active");
-
-            const filterValue = e.target.dataset.filter;
-            filterApiItems(filterValue);
+            filterApiItems(e.target.dataset.filter);
         };
     }
 
@@ -488,7 +541,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const isFav = item.dataset.fav === "1";
             const textContent = item.textContent.toLowerCase();
 
-            // Logic: Category Match && Search Match
             let categoryMatch = false;
             if (filterValue === "all") categoryMatch = true;
             else if (filterValue === "favorites") categoryMatch = isFav;
@@ -505,8 +557,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ================================================================
-    // 8. STATUS CHECKER (Background Task)
-    // Mengecek apakah endpoint online atau mati
+    // 9. STATUS CHECKER (Background Task)
     // ================================================================
 
     function checkAllEndpointStatuses() {
@@ -516,20 +567,18 @@ document.addEventListener("DOMContentLoaded", () => {
             const methodBadge = pill.closest(".api-card").querySelector(".http-badge");
             const method = methodBadge ? methodBadge.textContent : "GET";
             
-            // Skip checking POST/PUT (karena butuh body)
+            // Skip checking POST/PUT
             if (method !== "GET") {
                 pill.className = "endpoint-status-pill badge bg-success";
                 pill.textContent = "Ready";
                 return;
             }
 
-            // Normalisasi URL (tambah domain jika perlu)
             let urlToCheck = pill.dataset.path;
             if (!urlToCheck.startsWith("http")) {
                 urlToCheck = window.location.origin + urlToCheck;
             }
 
-            // Simple Check via HEAD request
             fetch(urlToCheck, { method: "HEAD" })
                 .then(res => {
                     const isOnline = res.ok || res.status === 405 || res.status === 400;
@@ -549,8 +598,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ================================================================
-    // 9. MODAL & REQUEST EXECUTION (HYBRID ENGINE)
-    // Bagian paling penting: Menangani request dan menampilkan hasil
+    // 10. MODAL & REQUEST EXECUTION (HYBRID ENGINE)
     // ================================================================
 
     function openApiModal(item) {
@@ -565,8 +613,8 @@ document.addEventListener("DOMContentLoaded", () => {
         DOM.modalStatusLine.textContent = "Ready to send...";
         DOM.modalStatusLine.className = "text-muted";
         
-        DOM.apiResponseContent.innerHTML = ""; // Bersihkan hasil lama
-        DOM.modalLoading.classList.add("d-none"); // Sembunyikan loader
+        DOM.apiResponseContent.innerHTML = ""; 
+        DOM.modalLoading.classList.add("d-none"); 
 
         // 2. Tambah ke History
         addToHistory(item);
@@ -576,10 +624,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // 4. SMART LOGIC: Cek Metode Request
         if (method === "POST" || method === "PUT") {
-            // SHOW UPLOAD FORM (Jika endpoint butuh file)
             renderUploadForm();
         } else {
-            // AUTO EXECUTE GET REQUEST
             executeApiRequest();
         }
     }
@@ -590,11 +636,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
                 <h5>File Upload Required</h5>
                 <p class="text-muted small">Endpoint ini membutuhkan file (Multipart/Form-Data).</p>
-                
                 <div class="mb-3 mt-4">
                     <input class="form-control form-control-lg" type="file" id="modalFileInput">
                 </div>
-                
                 <button id="triggerUploadBtn" class="btn btn-primary w-100 btn-lg shadow-sm">
                     <i class="fas fa-paper-plane me-2"></i> Kirim Request
                 </button>
@@ -602,14 +646,12 @@ document.addEventListener("DOMContentLoaded", () => {
             <div id="uploadResultContainer" class="mt-4"></div>
         `;
 
-        // Bind Event Tombol Upload
         document.getElementById("triggerUploadBtn").onclick = () => {
             const fileInput = document.getElementById("modalFileInput");
             if (fileInput.files.length === 0) {
                 showToast("Harap pilih file terlebih dahulu!", "warning");
                 return;
             }
-            // Execute dengan file
             executeApiRequest(fileInput.files[0]);
         };
     }
@@ -623,10 +665,8 @@ document.addEventListener("DOMContentLoaded", () => {
         let url = currentApiItem.path;
         if (!url.startsWith("http")) url = window.location.origin + url;
         
-        // Tentukan container output
         const resultContainer = document.getElementById("uploadResultContainer") || DOM.apiResponseContent;
         
-        // UI Updates
         DOM.modalLoading.classList.remove("d-none");
         DOM.modalStatusLine.textContent = "Sending Request...";
         DOM.modalStatusLine.className = "text-info fw-bold";
@@ -634,16 +674,14 @@ document.addEventListener("DOMContentLoaded", () => {
         appendLog(`[REQ] ${method} ${url}`);
 
         try {
-            // Prepare Fetch Options
             let fetchOptions = {
                 method: method,
                 headers: {}
             };
 
-            // Handle File Upload Body
             if ((method === "POST" || method === "PUT") && fileData) {
                 const formData = new FormData();
-                formData.append("file", fileData); // Key standar 'file'
+                formData.append("file", fileData); 
                 fetchOptions.body = formData;
             }
 
@@ -652,51 +690,29 @@ document.addEventListener("DOMContentLoaded", () => {
             const endTime = performance.now();
             const duration = (endTime - startTime).toFixed(0);
 
-            // Update Status Line
             const statusClass = response.ok ? "text-success" : "text-danger";
             DOM.modalStatusLine.innerHTML = `<span class="${statusClass} fw-bold">Status: ${response.status} ${response.statusText}</span> <span class="text-muted ms-2">(${duration}ms)</span>`;
 
-            // Cek Content Type untuk Render yang Tepat
             const contentType = response.headers.get("content-type");
             let renderHtml = "";
 
-            // Handle Redirects
             if (response.redirected) {
-                renderHtml += `
-                    <div class="alert alert-info shadow-sm mb-3">
-                        <i class="fas fa-info-circle me-2"></i> 
-                        <strong>Redirect Detected!</strong><br>
-                        Halaman dialihkan ke: <a href="${response.url}" target="_blank">${response.url}</a>
-                    </div>
-                `;
+                renderHtml += `<div class="alert alert-info shadow-sm mb-3">Redirected to: ${response.url}</div>`;
             }
 
-            // === RENDER LOGIC UTAMA ===
+            // === RENDER LOGIC ===
             
             // 1. IMAGE DIRECT
             if (contentType && contentType.startsWith("image/")) {
                 const blob = await response.blob();
                 const imgUrl = URL.createObjectURL(blob);
-                renderHtml += `
-                    <div class="text-center bg-dark p-3 rounded shadow-sm">
-                        <img src="${imgUrl}" class="img-fluid rounded" style="max-height: 400px; object-fit: contain;" alt="Response Image">
-                    </div>
-                    <div class="text-center mt-2 text-muted small">Image Blob Rendered</div>
-                `;
+                renderHtml += `<div class="text-center bg-dark p-3 rounded shadow-sm"><img src="${imgUrl}" class="img-fluid rounded" style="max-height: 400px;" alt="Response Image"></div>`;
             } 
             // 2. AUDIO DIRECT
             else if (contentType && contentType.startsWith("audio/")) {
                 const blob = await response.blob();
                 const audioUrl = URL.createObjectURL(blob);
-                renderHtml += `
-                    <div class="text-center p-4 bg-light rounded border shadow-sm">
-                        <i class="fas fa-music fa-3x mb-3 text-secondary"></i><br>
-                        <audio controls class="w-100">
-                            <source src="${audioUrl}" type="${contentType}">
-                            Browser tidak mendukung elemen audio.
-                        </audio>
-                    </div>
-                `;
+                renderHtml += `<div class="text-center p-4 bg-light rounded border shadow-sm"><audio controls class="w-100"><source src="${audioUrl}" type="${contentType}"></audio></div>`;
             }
             // 3. JSON / TEXT (Hybrid View Check)
             else {
@@ -705,8 +721,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 try {
                     const jsonObj = JSON.parse(textData);
                     
-                    // === FITUR HYBRID: TAMPILAN DOWNLOADER (YTMP3/MP4) ===
-                    // Jika JSON berisi structure { result: { type: 'audio', url: ... } }
+                    // A. TAMPILAN DOWNLOADER (YTMP3/MP4)
                     if (jsonObj.result && (jsonObj.result.type === 'audio' || jsonObj.result.type === 'video')) {
                         const r = jsonObj.result;
                         renderHtml += `
@@ -718,49 +733,40 @@ document.addEventListener("DOMContentLoaded", () => {
                                         ${r.duration ? `<i class="far fa-clock me-1"></i> ${r.duration}` : ''} 
                                         ${r.quality ? `<span class="mx-2">|</span> <i class="fas fa-video me-1"></i> ${r.quality}` : ''}
                                     </p>
-                                    
                                     <a href="${r.url}" target="_blank" class="btn btn-success btn-lg w-100 mb-2 py-3 shadow-sm">
                                         <i class="fas fa-download me-2"></i> Download ${r.type.toUpperCase()}
                                     </a>
-                                    <small class="text-muted">Klik tombol di atas untuk mengunduh.</small>
                                 </div>
-                                
                                 <div class="card-footer bg-light text-start">
                                     <details>
                                         <summary class="small text-primary fw-bold" style="cursor:pointer">Show Raw JSON (Developer)</summary>
-                                        <pre class="mt-2 p-3 bg-dark text-white rounded small" style="overflow-x: auto; max-height: 200px;">${JSON.stringify(jsonObj, null, 2)}</pre>
+                                        <pre class="mt-2 p-3 bg-dark text-white rounded small" style="overflow-x: auto;">${JSON.stringify(jsonObj, null, 2)}</pre>
                                     </details>
                                 </div>
                             </div>
                         `;
                     }
-                    // === FITUR HYBRID: UPLOAD RESULT (Tourl) ===
+                    // B. UPLOAD RESULT (Tourl)
                     else if (jsonObj.result && jsonObj.result.url) {
                         renderHtml += `
                             <div class="alert alert-success text-center shadow-sm">
-                                <h4 class="alert-heading"><i class="fas fa-check-circle"></i> Upload Success!</h4>
-                                <p>File Anda berhasil diunggah.</p>
-                                <hr>
-                                <div class="input-group mb-3">
+                                <h4>✅ Upload Success!</h4>
+                                <div class="input-group mb-3 mt-3">
                                     <input type="text" class="form-control" value="${jsonObj.result.url}" readonly>
                                     <button class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText('${jsonObj.result.url}')">Copy</button>
                                 </div>
                                 <a href="${jsonObj.result.url}" target="_blank" class="btn btn-primary btn-sm px-4">Buka Link</a>
                             </div>
-                            
-                            ${jsonObj.result.mime && jsonObj.result.mime.includes('image') ? `<div class="text-center mb-3"><img src="${jsonObj.result.url}" class="img-fluid rounded border shadow-sm" style="max-height: 200px;"></div>` : ''}
-                            
                             <pre class="bg-dark text-white p-3 rounded shadow-sm">${JSON.stringify(jsonObj, null, 2)}</pre>
                         `;
                     }
-                    // === JSON BIASA ===
+                    // C. JSON BIASA
                     else {
                         const prettyJson = JSON.stringify(jsonObj, null, 2);
                         renderHtml += `<pre class="json-response p-3 rounded shadow-sm" style="background: #1e1e1e; color: #d4d4d4; overflow: auto; max-height: 400px; font-family: 'Consolas', monospace;"><code>${prettyJson}</code></pre>`;
                     }
-                
                 } catch (e) {
-                    // Jika bukan JSON (Plain Text / HTML Error)
+                    // Plain Text
                     renderHtml += `<pre class="p-3 bg-light border rounded shadow-sm text-wrap">${textData}</pre>`;
                 }
             }
@@ -770,13 +776,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } catch (error) {
             console.error(error);
-            const errorHtml = `
-                <div class="alert alert-danger shadow-sm">
-                    <strong><i class="fas fa-exclamation-triangle"></i> Request Failed:</strong><br>
-                    ${error.message}
-                </div>
-            `;
-            resultContainer.innerHTML = errorHtml;
+            resultContainer.innerHTML = `<div class="alert alert-danger shadow-sm"><strong>Request Failed:</strong><br>${error.message}</div>`;
             DOM.modalStatusLine.textContent = "Network Error";
             DOM.modalStatusLine.className = "text-danger fw-bold";
             appendLog(`[ERR] ${error.message}`, "error");
@@ -786,7 +786,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // FIX: ANTI STUCK MODAL
-    // Menghapus elemen pengganggu jika modal ditutup paksa
     if (DOM.modalEl) {
         DOM.modalEl.addEventListener('hidden.bs.modal', function () {
             document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
@@ -797,73 +796,46 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ================================================================
-    // 10. EVENTS & INTERACTIONS
-    // Event listeners untuk tombol dan interaksi user
+    // 11. EVENTS & INTERACTIONS
     // ================================================================
 
     function initEvents() {
-        // Copy Full Endpoint (Smart Logic: Add Domain if missing)
         if (DOM.copyEndpointBtn) {
             DOM.copyEndpointBtn.addEventListener("click", async () => {
                 let path = DOM.endpointText.textContent.trim();
-                let fullUrl;
-                
-                if (path.startsWith("http")) {
-                    fullUrl = path;
-                } else {
-                    fullUrl = window.location.origin + path;
-                }
-
+                let fullUrl = path.startsWith("http") ? path : window.location.origin + path;
                 try {
                     await navigator.clipboard.writeText(fullUrl);
                     showToast("Link Endpoint Tersalin!");
-                    
-                    // Button Feedback
-                    const originalIcon = DOM.copyEndpointBtn.innerHTML;
-                    DOM.copyEndpointBtn.innerHTML = `<i class="fas fa-check"></i> Copied`;
-                    setTimeout(() => DOM.copyEndpointBtn.innerHTML = originalIcon, 2000);
-                } catch (err) {
-                    showToast("Gagal menyalin link", "danger");
-                }
+                } catch (err) { showToast("Gagal menyalin link", "danger"); }
             });
         }
 
-        // Copy cURL Command
         if (DOM.copyCurlBtn) {
             DOM.copyCurlBtn.addEventListener("click", async () => {
                 if (!currentApiItem) return;
-                
                 const method = (currentApiItem.method || "GET").toUpperCase();
                 let fullUrl = currentApiItem.path;
                 if (!fullUrl.startsWith("http")) fullUrl = window.location.origin + fullUrl;
-                
                 const curlCommand = `curl -X ${method} "${fullUrl}"`;
-
                 try {
                     await navigator.clipboard.writeText(curlCommand);
                     showToast("Perintah cURL Tersalin!");
-                } catch (err) {
-                    showToast("Gagal menyalin cURL", "danger");
-                }
+                } catch (err) { showToast("Gagal menyalin cURL", "danger"); }
             });
         }
 
-        // WhatsApp Request Handler
         if (DOM.sendApiRequest) {
             DOM.sendApiRequest.addEventListener("click", () => {
                 const msg = DOM.apiRequestInput.value.trim();
-                if (!msg) {
-                    showToast("Ketik permintaan dulu!", "warning");
-                    return;
-                }
-                const phone = "6287751121269"; // Nomor Admin
-                const text = encodeURIComponent(`Halo Admin, saya mau request API baru:\n\n${msg}`);
+                if (!msg) { showToast("Ketik permintaan dulu!", "warning"); return; }
+                const phone = "6287751121269"; 
+                const text = encodeURIComponent(`Halo Admin, Request API:\n\n${msg}`);
                 window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
                 DOM.apiRequestInput.value = "";
             });
         }
 
-        // Search Input Handler
         if (DOM.searchInput) {
             DOM.searchInput.addEventListener("input", () => {
                 const activeFilterBtn = DOM.apiFilters.querySelector(".active");
@@ -875,146 +847,49 @@ document.addEventListener("DOMContentLoaded", () => {
         if (DOM.clearSearch) {
             DOM.clearSearch.addEventListener("click", () => {
                 DOM.searchInput.value = "";
-                const activeFilterBtn = DOM.apiFilters.querySelector(".active");
-                const filterVal = activeFilterBtn ? activeFilterBtn.dataset.filter : "all";
-                filterApiItems(filterVal);
+                filterApiItems("all");
             });
         }
     }
 
     // ================================================================
-    // 11. VISUAL EFFECTS (PARALLAX & GLOW)
-    // Efek visual tambahan untuk mempercantik UI
+    // 12. INITIALIZATION
     // ================================================================
 
     function initVisualEffects() {
-        // Banner Parallax Effect
+        // Banner Parallax
         if (DOM.bannerParallax) {
             DOM.bannerParallax.addEventListener("mousemove", (e) => {
                 const rect = DOM.bannerParallax.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                
-                // Calculate percentage -0.5 to 0.5
-                const xPercent = (x / rect.width - 0.5) * 2; 
-                const yPercent = (y / rect.height - 0.5) * 2;
-
+                const x = (e.clientX - rect.left) / rect.width - 0.5;
+                const y = (e.clientY - rect.top) / rect.height - 0.5;
                 const img = DOM.bannerParallax.querySelector("img");
-                if (img) {
-                    img.style.transform = `scale(1.1) translate(${xPercent * 10}px, ${yPercent * 10}px)`;
-                }
-            });
-
-            DOM.bannerParallax.addEventListener("mouseleave", () => {
-                const img = DOM.bannerParallax.querySelector("img");
-                if (img) img.style.transform = `scale(1) translate(0,0)`;
+                if (img) img.style.transform = `scale(1.1) translate(${x * 20}px, ${y * 20}px)`;
             });
         }
-
-        // Cursor Glow Effect
-        if (DOM.cursorGlow) {
-            document.addEventListener("mousemove", (e) => {
-                // Offset cursor sedikit agar pas tengah
-                const x = e.clientX;
-                const y = e.clientY;
-                DOM.cursorGlow.style.transform = `translate(${x}px, ${y}px)`;
-            });
-        }
-
-        // Scroll Reveal Animation
+        
+        // Scroll Reveal
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add("reveal-visible");
-                }
+                if (entry.isIntersecting) entry.target.classList.add("reveal-visible");
             });
         }, { threshold: 0.1 });
-
         document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-    }
-
-    // ================================================================
-    // 12. INITIALIZATION (BOOT SEQUENCE)
-    // Langkah-langkah inisialisasi aplikasi saat pertama kali dibuka
-    // ================================================================
-
-    async function loadSettings() {
-        try {
-            appendLog("Menghubungi settings.json...");
-            
-            // Tambahkan timestamp agar browser tidak cache file settings
-            const res = await fetch("/src/settings.json?t=" + new Date().getTime());
-            
-            if (!res.ok) throw new Error(`HTTP Error ${res.status}: ${res.statusText}`);
-            
-            appSettings = await res.json();
-            appendLog("Settings loaded successfully.");
-            
-            if(DOM.versionBadge && appSettings.version) {
-                DOM.versionBadge.textContent = appSettings.version;
-            }
-            renderApiContent();
-            
-        } catch (err) {
-            // --- CRITICAL ERROR DISPLAY (RED SCREEN) ---
-            console.error(err);
-            appendLog(`FATAL ERROR: ${err.message}`, "error");
-            
-            if(DOM.apiContent) {
-                DOM.apiContent.innerHTML = `
-                    <div style="margin: 30px; padding: 30px; border: 2px solid #ff4444; background: #fff5f5; border-radius: 12px; color: #cc0000; text-align: center; box-shadow: 0 4px 15px rgba(255,0,0,0.1);">
-                        <i class="fas fa-bug fa-3x mb-3"></i>
-                        <h3 style="margin-top:0; font-weight:800;">⚠️ Gagal Memuat Data API</h3>
-                        <p style="font-size: 1.1em;">Aplikasi tidak dapat membaca file konfigurasi.</p>
-                        
-                        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ffcccc; margin: 20px 0; text-align: left; font-family: monospace; color: #333;">
-                            <strong>Error Details:</strong><br>
-                            ${err.message}
-                        </div>
-
-                        <p style="font-size: 0.9em; text-align: left; color: #555;">
-                            <b>Langkah Perbaikan:</b><br>
-                            1. Pastikan file <code>src/settings.json</code> ada di folder yang benar.<br>
-                            2. Cek file <code>vercel.json</code>, pastikan folder <code>src</code> ikut ter-upload.<br>
-                            3. Pastikan server <code>index.js</code> mengizinkan akses statis ke folder src.
-                        </p>
-                        <button onclick="location.reload()" class="btn btn-danger btn-lg mt-3 shadow-sm">
-                            <i class="fas fa-sync-alt me-2"></i> Coba Refresh Halaman
-                        </button>
-                    </div>
-                `;
-            }
-            
-            // Fallback content agar tidak kosong total (Opsional)
-            appSettings = { categories: fallbackCategories };
-        }
     }
 
     async function initApp() {
         appendLog("Initializing Ada API Console...");
-        
-        // 1. Setup UI Components
         initSidebarLogic();
         initThemeEngine();
         initVisualEffects();
         initEvents();
         renderHistoryList();
-
-        // 2. Load Data from Server
+        
+        // Load Data from Server
         await loadSettings();
-
-        // 3. Setup Search Listener
-        if (DOM.searchInput) {
-            DOM.searchInput.addEventListener("input", () => {
-                const activeFilterBtn = DOM.apiFilters.querySelector(".active");
-                const filterVal = activeFilterBtn ? activeFilterBtn.dataset.filter : "all";
-                filterApiItems(filterVal);
-            });
-        }
-
+        
         appendLog("System Ready.");
     }
 
-    // Start Application
     initApp();
 });
