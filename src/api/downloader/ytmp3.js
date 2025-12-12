@@ -1,12 +1,9 @@
 const axios = require('axios');
 
 module.exports = function(app) {
-
-    // 👇 INI SUDAH BENAR SEKARANG. Sesuai nama folder 'downloader'.
-    app.get('/api/downloader/ytmp3', async (req, res) => {
+    app.get('/api/download/ytmp3', async (req, res) => {
         const url = req.query.url;
 
-        // 1. Validasi Input
         if (!url) {
             return res.status(400).json({
                 status: false,
@@ -15,7 +12,7 @@ module.exports = function(app) {
             });
         }
 
-        // 2. Validasi Link YouTube
+        // Validasi Regex Link YouTube
         const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
         if (!youtubeRegex.test(url)) {
             return res.status(400).json({
@@ -26,20 +23,19 @@ module.exports = function(app) {
         }
 
         try {
-            // 3. Request ke Nekolabs (Logic yang kamu suka)
             const encodedUrl = encodeURIComponent(url);
             const nekolabsUrl = `https://api.nekolabs.web.id/downloader/youtube/v1?url=${encodedUrl}&format=mp3`;
             
             const response = await axios.get(nekolabsUrl, {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36'
-                },
-                timeout: 9000
+                }
             });
             
             const data = response.data;
 
-            // 4. Cek Sukses
+            // === PERBAIKAN DI SINI ===
+            // Nekolabs pakai 'success', bukan 'status'. Dan isinya di 'result', bukan 'data'.
             if (!data || !data.success) {
                 return res.status(500).json({
                     status: false,
@@ -49,15 +45,18 @@ module.exports = function(app) {
                 });
             }
 
-            // 5. Kirim Hasil
             res.status(200).json({
                 status: true,
                 creator: "Ada API",
-                result: {
-                    type: "audio",
+                metadata: {
                     title: data.result.title,
-                    thumb: data.result.cover,
-                    url: data.result.downloadUrl,
+                    originalUrl: url,
+                    duration: data.result.duration,
+                    cover: data.result.cover
+                },
+                // Link download ada di data.result.downloadUrl
+                result: {
+                    downloadUrl: data.result.downloadUrl,
                     quality: data.result.quality,
                     format: data.result.format
                 }
@@ -65,10 +64,10 @@ module.exports = function(app) {
 
         } catch (error) {
             console.error(error);
-            if (error.code === 'ECONNABORTED') {
-                return res.status(504).json({ status: false, error: "Server Timeout (Nekolabs sibuk)." });
-            }
-            res.status(500).json({ status: false, error: error.message });
+            res.status(500).json({ 
+                status: false, 
+                error: error.message 
+            });
         }
     });
 };
