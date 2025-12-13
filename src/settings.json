@@ -38,7 +38,7 @@
       ]
     },
     {
-      "name": "Download",
+      "name": "Downloader",
       "items": [
         {
           "name": "YouTube MP3",
@@ -75,6 +75,21 @@
           "method": "GET",
           "params": {
             "q": "Search query"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tools",
+      "items": [
+        {
+          "name": "Tourl (Upload)",
+          "desc": "Upload File/Gambar menjadi Link URL (Auto Fallback Catbox/Yupra).",
+          "path": "/api/tools/tourl",
+          "status": "ready",
+          "method": "POST",
+          "params": {
+            "file": "Media (Image/Video/Doc)"
           }
         }
       ]
