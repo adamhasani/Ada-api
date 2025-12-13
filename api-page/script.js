@@ -1,4 +1,5 @@
 // Ada API Console – script utama (nyambung ke index.html + src/settings.json)
+// Versi FULL: Original Structure + Smart Upload & Image Support
 
 document.addEventListener("DOMContentLoaded", () => {
   // ================================
@@ -641,6 +642,12 @@ document.addEventListener("DOMContentLoaded", () => {
         .trim()
         .toUpperCase();
 
+      // Skip check for POST endpoints to prevent accidental execution
+      if (method === "POST") {
+        setStatusPill(statusEl, "online");
+        return;
+      }
+
       const fetchMethod = method === "GET" ? "GET" : "GET";
 
       setStatusPill(statusEl, "checking");
@@ -660,11 +667,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ================================
-  // MODAL & REQUEST
+  // MODAL & REQUEST (SMART UPLOAD & IMAGE SUPPORT)
   // ================================
+  
   function openApiModal(item) {
     currentApiItem = item;
     if (!DOM.modalEl) return;
+    const method = (item.method || "GET").toUpperCase();
 
     const url = item.path || "";
 
@@ -673,7 +682,7 @@ document.addEventListener("DOMContentLoaded", () => {
       DOM.modalSubtitle.textContent = item.desc || url || "";
     if (DOM.endpointText) DOM.endpointText.textContent = url;
     if (DOM.modalStatusLine) DOM.modalStatusLine.textContent = "";
-    if (DOM.apiResponseContent) DOM.apiResponseContent.textContent = "";
+    if (DOM.apiResponseContent) DOM.apiResponseContent.innerHTML = ""; 
     if (DOM.modalLoading) DOM.modalLoading.classList.add("d-none");
 
     addHistory({ name: item.name || "Endpoint", path: url });
@@ -681,13 +690,51 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (modalInstance) modalInstance.show();
 
-    sendApiRequest();
+    // === LOGIKA BARU: DETEKSI UPLOAD VS GET ===
+    if (method === "POST") {
+        // Tampilkan Form Upload manual
+        DOM.apiResponseContent.innerHTML = `
+        <div style="text-align: center; padding: 2rem; border: 2px dashed var(--border-color); border-radius: 12px; background: rgba(0,0,0,0.02);">
+            <i class="fas fa-file-upload fa-3x mb-3" style="color: var(--primary-color);"></i>
+            <h5 class="mb-2">Upload File Required</h5>
+            <p class="text-muted small mb-4">Endpoint ini membutuhkan file untuk diproses.</p>
+            
+            <input type="file" id="manualFileInput" class="form-control mb-3">
+            
+            <button id="manualExecBtn" class="btn btn-primary w-100">
+                <i class="fas fa-paper-plane me-2"></i> Kirim Request
+            </button>
+        </div>
+        <div id="realResultArea" class="mt-3"></div>
+        `;
+
+        // Bind event ke tombol manual
+        const btn = document.getElementById("manualExecBtn");
+        const input = document.getElementById("manualFileInput");
+
+        if(btn && input) {
+            btn.onclick = () => {
+                if(input.files.length === 0) {
+                    alert("Harap pilih file terlebih dahulu!");
+                    return;
+                }
+                // Jalankan request dengan membawa file
+                sendApiRequest(input.files[0]);
+            };
+        }
+    } else {
+        // Jika GET biasa, langsung eksekusi otomatis
+        sendApiRequest();
+    }
   }
 
-  async function sendApiRequest() {
+  async function sendApiRequest(fileData = null) {
     if (!currentApiItem) return;
     const method = (currentApiItem.method || "GET").toUpperCase();
     const url = currentApiItem.path || "";
+    
+    // Tentukan area output (timpa form upload atau div hasil)
+    const outputArea = document.getElementById("realResultArea") || DOM.apiResponseContent;
 
     if (!url) return;
 
@@ -695,27 +742,73 @@ document.addEventListener("DOMContentLoaded", () => {
       DOM.modalStatusLine.textContent = "Mengirim permintaan…";
     }
     if (DOM.modalLoading) DOM.modalLoading.classList.remove("d-none");
-    if (DOM.apiResponseContent) DOM.apiResponseContent.textContent = "";
+    if (!fileData) {
+        // Bersihkan area output jika bukan mode upload append
+        // (Kalau mode upload, kita biarkan form di atasnya tetap ada)
+        // outputArea.innerHTML = ""; 
+    }
 
     appendLog(`Request ${method} ${url}`);
 
     try {
-      const res = await fetch(url, { method });
-      const text = await res.text();
-      const pretty = beautifyJSON(text);
+      let options = { method };
 
-      if (DOM.apiResponseContent) {
-        DOM.apiResponseContent.textContent = pretty;
+      // --- LOGIKA FORM DATA (UPLOAD) ---
+      if (method === "POST" && fileData) {
+        const formData = new FormData();
+        formData.append("file", fileData);
+        options.body = formData;
       }
+
+      const res = await fetch(url, options);
+      const contentType = res.headers.get("content-type");
+
+      let contentHtml = "";
+
+      // --- LOGIKA DETEKSI GAMBAR ---
+      if (contentType && contentType.startsWith("image/")) {
+        const blob = await res.blob();
+        const imageUrl = URL.createObjectURL(blob);
+        contentHtml = `
+            <div style="text-align: center;">
+                <img src="${imageUrl}" alt="Result Image" style="max-width: 100%; border-radius: 8px; border: 1px solid var(--border-color); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div style="margin-top: 8px; font-size: 0.8rem; opacity: 0.7;">Image Blob Result</div>
+            </div>`;
+      } 
+      // --- LOGIKA TEXT/JSON ---
+      else {
+        const text = await res.text();
+        const pretty = beautifyJSON(text);
+        
+        // Cek Link URL hasil Tourl
+        try {
+            const json = JSON.parse(text);
+            if(json.status && json.result && json.result.url) {
+                contentHtml += `
+                <div class="alert alert-success mt-2">
+                    <strong>Upload Berhasil!</strong><br>
+                    URL: <a href="${json.result.url}" target="_blank">${json.result.url}</a>
+                </div>
+                <div style="text-align: center; margin-bottom: 1rem;">
+                    <img src="${json.result.url}" style="max-height: 150px; border-radius: 6px;">
+                </div>`;
+            }
+        } catch {}
+
+        contentHtml += `<pre style="background: var(--bg-card); padding: 1rem; border-radius: 8px; overflow-x: auto;">${pretty}</pre>`;
+      }
+
+      outputArea.innerHTML = contentHtml;
+
       if (DOM.modalStatusLine) {
         DOM.modalStatusLine.textContent = `Status: ${res.status} ${
           res.ok ? "(OK)" : "(Error)"
         }`;
       }
-      appendLog(`Response ${res.status} untuk ${url}`);
+      appendLog(`Response ${res.status} untuk ${url} (${contentType || 'unknown'})`);
     } catch (err) {
-      if (DOM.apiResponseContent) {
-        DOM.apiResponseContent.textContent = String(err);
+      if (outputArea) {
+        outputArea.textContent = String(err);
       }
       if (DOM.modalStatusLine) {
         DOM.modalStatusLine.textContent = "Gagal melakukan request.";
