@@ -4,6 +4,7 @@ module.exports = function(app) {
     app.get('/api/download/ytmp3', async (req, res) => {
         const url = req.query.url;
 
+        // 1. Validasi Input
         if (!url) {
             return res.status(400).json({
                 status: false,
@@ -12,7 +13,7 @@ module.exports = function(app) {
             });
         }
 
-        // Validasi Regex Link YouTube
+        // 2. Validasi Regex YouTube
         const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
         if (!youtubeRegex.test(url)) {
             return res.status(400).json({
@@ -24,49 +25,121 @@ module.exports = function(app) {
 
         try {
             const encodedUrl = encodeURIComponent(url);
-            const nekolabsUrl = `https://api.nekolabs.web.id/downloader/youtube/v1?url=${encodedUrl}&format=mp3`;
-            
-            const response = await axios.get(nekolabsUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36'
-                }
-            });
-            
-            const data = response.data;
+            const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
 
-            // === PERBAIKAN DI SINI ===
-            // Nekolabs pakai 'success', bukan 'status'. Dan isinya di 'result', bukan 'data'.
-            if (!data || !data.success) {
-                return res.status(500).json({
-                    status: false,
-                    creator: "Ada API",
-                    error: "Gagal mengambil data dari server downloader.",
-                    debug: data 
-                });
-            }
-
-            res.status(200).json({
-                status: true,
-                creator: "Ada API",
-                metadata: {
+            // --- PEMBALAP 1: NEKO V1 ---
+            const raceNekoV1 = async () => {
+                const apiUrl = `https://api.nekolabs.web.id/downloader/youtube/v1?url=${encodedUrl}&format=mp3`;
+                const { data } = await axios.get(apiUrl, { headers: { 'User-Agent': userAgent } });
+                
+                if (!data || !data.success) throw new Error('Neko V1 Gagal');
+                
+                return {
+                    source: 'Neko V1',
                     title: data.result.title,
                     originalUrl: url,
                     duration: data.result.duration,
-                    cover: data.result.cover
-                },
-                // Link download ada di data.result.downloadUrl
-                result: {
+                    cover: data.result.cover,
                     downloadUrl: data.result.downloadUrl,
                     quality: data.result.quality,
                     format: data.result.format
+                };
+            };
+
+            // --- PEMBALAP 2: NEKO V2 ---
+            const raceNekoV2 = async () => {
+                const apiUrl = `https://api.nekolabs.web.id/downloader/youtube/v2?url=${encodedUrl}`; 
+                const { data } = await axios.get(apiUrl, { headers: { 'User-Agent': userAgent } });
+
+                if (!data || !data.success) throw new Error('Neko V2 Gagal');
+
+                return {
+                    source: 'Neko V2',
+                    title: data.result.title,
+                    originalUrl: url,
+                    duration: data.result.duration,
+                    cover: data.result.cover,
+                    downloadUrl: data.result.downloadUrl,
+                    quality: '128kbps',
+                    format: 'mp3'
+                };
+            };
+
+            // --- PEMBALAP 3: ZENZ API ---
+            const raceZenz = async () => {
+                const apiUrl = `https://api.zenzxz.my.id/api/downloader/ytmp3?url=${encodedUrl}`;
+                const { data } = await axios.get(apiUrl, { headers: { 'User-Agent': userAgent } });
+
+                if (!data || !data.result) throw new Error('Zenz Gagal');
+
+                return {
+                    source: 'Zenz API',
+                    title: data.result.title || 'YouTube Audio',
+                    originalUrl: url,
+                    duration: data.result.duration || '-',
+                    cover: data.result.thumb || data.result.thumbnail,
+                    downloadUrl: data.result.url || data.result.download,
+                    quality: '128kbps',
+                    format: 'mp3'
+                };
+            };
+
+            // --- PEMBALAP 4: YUPRA (BARU) ---
+            const raceYupra = async () => {
+                // Menggunakan endpoint downloader agar dapat link MP3 langsung
+                const apiUrl = `https://api.yupra.my.id/api/downloader/ytmp3?url=${encodedUrl}`;
+                const { data } = await axios.get(apiUrl, { headers: { 'User-Agent': userAgent } });
+
+                // Yupra biasanya me-return data.result atau data.url langsung
+                const res = data.result || data; 
+                if (!res || (!res.url && !res.download_url)) throw new Error('Yupra Gagal');
+
+                return {
+                    source: 'Yupra API',
+                    title: res.title || 'YouTube Audio',
+                    originalUrl: url,
+                    duration: res.duration || '-',
+                    cover: res.thumb || res.thumbnail,
+                    downloadUrl: res.url || res.download_url,
+                    quality: '128kbps',
+                    format: 'mp3'
+                };
+            };
+
+            // --- START BALAPAN (4 SERVERS) ---
+            // Mengambil siapa saja yang selesai & sukses duluan
+            const winner = await Promise.any([
+                raceNekoV1(),
+                raceNekoV2(),
+                raceZenz(),
+                raceYupra()
+            ]);
+
+            // --- KIRIM RESPONSE ---
+            res.status(200).json({
+                status: true,
+                creator: "Ada API",
+                server: winner.source, // Debugging: Server mana yang menang
+                metadata: {
+                    title: winner.title,
+                    originalUrl: winner.originalUrl,
+                    duration: winner.duration,
+                    cover: winner.cover || 'https://i.imgur.com/MDSfT22.jpeg'
+                },
+                result: {
+                    downloadUrl: winner.downloadUrl,
+                    quality: winner.quality || '128kbps',
+                    format: winner.format || 'mp3'
                 }
             });
 
         } catch (error) {
-            console.error(error);
+            console.error("All 4 racers failed:", error);
             res.status(500).json({ 
                 status: false, 
-                error: error.message 
+                creator: "Ada API",
+                error: "Semua server (Neko, Zenz, Yupra) sedang sibuk.",
+                message: error.errors ? error.errors.map(e => e.message) : error.message
             });
         }
     });
