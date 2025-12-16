@@ -1,104 +1,140 @@
 const axios = require('axios');
-const https = require('https'); // Wajib import ini
+const https = require('https');
 
 module.exports = function(app) {
     app.get('/api/download/ytmp3', async (req, res) => {
         const url = req.query.url;
 
+        // 1. Validasi Input
         if (!url) {
             return res.status(400).json({ status: false, creator: "Ada API", error: "Parameter 'url' is required." });
         }
-
-        const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
-        if (!youtubeRegex.test(url)) {
+        
+        // 2. Cek apakah itu link YouTube
+        // Regex diperluas biar support short link & music
+        if (!url.match(/youtu/)) {
             return res.status(400).json({ status: false, creator: "Ada API", error: "Invalid YouTube URL." });
         }
 
         try {
             const encodedUrl = encodeURIComponent(url);
 
-            // --- SETTINGAN ANTI-DISCONNECT ---
-            // Ini obat untuk error "Socket Disconnected"
+            // --- SETTINGAN ANTI-DISCONNECT & ANTI-SSL ERROR ---
+            // Ini kunci agar "Socket Disconnected" tidak muncul lagi
             const agent = new https.Agent({  
-                keepAlive: true,
-                rejectUnauthorized: false // Bypass SSL error biar ga rewel
+                keepAlive: true, 
+                rejectUnauthorized: false // Abaikan error sertifikat (penting buat scraping)
             });
 
             const axiosConfig = {
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/114.0.0.0 Safari/537.36',
                     'Referer': 'https://www.google.com/',
                     'Accept': 'application/json'
                 },
-                httpsAgent: agent, // Pasang agent disini
-                timeout: 10000 // Batas waktu 10 detik per request (biar ga ngegantung)
+                httpsAgent: agent, // Pasang agen disini
+                timeout: 8000 // Batas waktu 8 detik (agar serverless tidak timeout)
             };
 
-            // --- PEMBALAP 1: NEKO V1 ---
-            const raceNekoV1 = async () => {
-                const { data } = await axios.get(`https://api.nekolabs.web.id/downloader/youtube/v1?url=${encodedUrl}&format=mp3`, axiosConfig);
-                if (!data || !data.success) throw new Error('Neko V1 Gagal');
-                return {
-                    source: 'Neko V1',
-                    title: data.result.title,
-                    originalUrl: url,
-                    duration: data.result.duration,
-                    cover: data.result.cover,
-                    downloadUrl: data.result.downloadUrl,
-                    quality: data.result.quality,
-                    format: data.result.format
-                };
-            };
+            // --- DAFTAR PEMBALAP (SERVER) ---
+            const racers = [
+                // 1. NEKO V1
+                async () => {
+                    const { data } = await axios.get(`https://api.nekolabs.web.id/downloader/youtube/v1?url=${encodedUrl}&format=mp3`, axiosConfig);
+                    if (!data || !data.success) throw new Error('V1 fail');
+                    return {
+                        server: 'Neko V1',
+                        title: data.result.title,
+                        cover: data.result.cover,
+                        downloadUrl: data.result.downloadUrl
+                    };
+                },
+                // 2. NEKO V2
+                async () => {
+                    const { data } = await axios.get(`https://api.nekolabs.web.id/downloader/youtube/v2?url=${encodedUrl}`, axiosConfig);
+                    if (!data || !data.success) throw new Error('V2 fail');
+                    return {
+                        server: 'Neko V2',
+                        title: data.result.title,
+                        cover: data.result.cover,
+                        downloadUrl: data.result.downloadUrl
+                    };
+                },
+                // 3. ZENZ API
+                async () => {
+                    const { data } = await axios.get(`https://api.zenzxz.my.id/api/downloader/ytmp3?url=${encodedUrl}`, axiosConfig);
+                    if (!data || !data.result) throw new Error('Zenz fail');
+                    return {
+                        server: 'Zenz',
+                        title: data.result.title,
+                        cover: data.result.thumb,
+                        downloadUrl: data.result.url
+                    };
+                },
+                // 4. YUPRA API
+                async () => {
+                    const { data } = await axios.get(`https://api.yupra.my.id/api/downloader/ytmp3?url=${encodedUrl}`, axiosConfig);
+                    const r = data.result || data;
+                    if (!r || (!r.url && !r.download_url)) throw new Error('Yupra fail');
+                    return {
+                        server: 'Yupra',
+                        title: r.title,
+                        cover: r.thumb,
+                        downloadUrl: r.url || r.download_url
+                    };
+                }
+            ];
 
-            // --- PEMBALAP 2: NEKO V2 ---
-            const raceNekoV2 = async () => {
-                const { data } = await axios.get(`https://api.nekolabs.web.id/downloader/youtube/v2?url=${encodedUrl}`, axiosConfig);
-                if (!data || !data.success) throw new Error('Neko V2 Gagal');
-                return {
-                    source: 'Neko V2',
-                    title: data.result.title,
-                    originalUrl: url,
-                    duration: data.result.duration,
-                    cover: data.result.cover,
-                    downloadUrl: data.result.downloadUrl,
-                    quality: '128kbps',
-                    format: 'mp3'
-                };
-            };
+            // --- LOGIKA BALAPAN MANUAL (KOMPATIBEL SEMUA VERSI NODE) ---
+            // Kita tidak pakai Promise.any() karena bikin crash di Node versi lama.
+            // Kita pakai Promise biasa dengan logika counter.
+            
+            const winner = await new Promise((resolve, reject) => {
+                let failureCount = 0;
+                
+                // Jalankan semua server SEKALIGUS
+                racers.forEach(racer => {
+                    racer()
+                        .then(result => {
+                            // Kalau ada satu yang berhasil, langsung selesaikan (Resolve)
+                            resolve(result);
+                        })
+                        .catch(err => {
+                            // Kalau gagal, tambah counter
+                            failureCount++;
+                            // Jika SEMUA server (4) sudah gagal, baru kita nyerah (Reject)
+                            if (failureCount === racers.length) {
+                                reject(new Error("Maaf, semua server (Neko/Zenz/Yupra) sedang down atau sibuk."));
+                            }
+                        });
+                });
+            });
 
-            // --- PEMBALAP 3: ZENZ API ---
-            const raceZenz = async () => {
-                const { data } = await axios.get(`https://api.zenzxz.my.id/api/downloader/ytmp3?url=${encodedUrl}`, axiosConfig);
-                if (!data || !data.result) throw new Error('Zenz Gagal');
-                return {
-                    source: 'Zenz API',
-                    title: data.result.title || 'YouTube Audio',
-                    originalUrl: url,
-                    duration: data.result.duration || '-',
-                    cover: data.result.thumb || data.result.thumbnail,
-                    downloadUrl: data.result.url || data.result.download,
-                    quality: '128kbps',
-                    format: 'mp3'
-                };
-            };
+            // --- KIRIM HASIL KE USER ---
+            res.status(200).json({
+                status: true,
+                creator: "Ada API",
+                server: winner.server, // Info server mana yang menang
+                metadata: {
+                    title: winner.title || 'Unknown Title',
+                    cover: winner.cover || 'https://i.imgur.com/MDSfT22.jpeg'
+                },
+                result: {
+                    downloadUrl: winner.downloadUrl
+                }
+            });
 
-            // --- PEMBALAP 4: YUPRA ---
-            const raceYupra = async () => {
-                const { data } = await axios.get(`https://api.yupra.my.id/api/downloader/ytmp3?url=${encodedUrl}`, axiosConfig);
-                const res = data.result || data; 
-                if (!res || (!res.url && !res.download_url)) throw new Error('Yupra Gagal');
-                return {
-                    source: 'Yupra API',
-                    title: res.title || 'YouTube Audio',
-                    originalUrl: url,
-                    duration: res.duration || '-',
-                    cover: res.thumb || res.thumbnail,
-                    downloadUrl: res.url || res.download_url,
-                    quality: '128kbps',
-                    format: 'mp3'
-                };
-            };
-
+        } catch (error) {
+            console.error("Critical Error:", error.message);
+            res.status(500).json({ 
+                status: false, 
+                creator: "Ada API", 
+                error: "Internal Server Error",
+                message: error.message 
+            });
+        }
+    });
+};
             // --- START BALAPAN ---
             const winner = await Promise.any([
                 raceNekoV1(),
